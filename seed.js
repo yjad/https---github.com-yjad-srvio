@@ -9,12 +9,17 @@ const dbPath = path.resolve(__dirname, 'db.json');
 
 const defaultSeedData = {
   categories: [
-    { id: 1, name: "Cleaning", icon: "🧹", description: "Home and office cleaning", color: "#3b82f6", activationDate: "2025-01-01", isActive: true },
-    { id: 2, name: "Plumbing", icon: "🪠", description: "Pipe and leak repairs", color: "#10b981", activationDate: "2025-01-01", isActive: true },
-    { id: 3, name: "Electrical", icon: "⚡", description: "Electrical installations and repairs", color: "#f59e0b", activationDate: "2025-01-01", isActive: true },
-    { id: 4, name: "Handyman", icon: "🛠️", description: "General repairs and assembly", color: "#6366f1", activationDate: "2025-01-01", isActive: true },
-    { id: 5, name: "Painting", icon: "🎨", description: "Interior and exterior painting", color: "#ec4899", activationDate: "2025-01-01", isActive: true },
-    { id: 6, name: "Landscaping", icon: "🌿", description: "Garden and yard maintenance", color: "#14b8a6", activationDate: "2025-01-01", isActive: true }
+    { id: 1, name: "Cleaning", icon: "🧹", description: "Home and office cleaning", color: "#3b82f6", activationDate: "2025-01-01", familyId: 1, isActive: true },
+    { id: 2, name: "Plumbing", icon: "🪠", description: "Pipe and leak repairs", color: "#10b981", activationDate: "2025-01-01", familyId: 1, isActive: true },
+    { id: 3, name: "Electrical", icon: "⚡", description: "Electrical installations and repairs", color: "#f59e0b", activationDate: "2025-01-01", familyId: 1, isActive: true },
+    { id: 4, name: "Handyman", icon: "🛠️", description: "General repairs and assembly", color: "#6366f1", activationDate: "2025-01-01", familyId: 1, isActive: true },
+    { id: 5, name: "Painting", icon: "🎨", description: "Interior and exterior painting", color: "#ec4899", activationDate: "2025-01-01", familyId: 1, isActive: true },
+    { id: 6, name: "Landscaping", icon: "🌿", description: "Garden and yard maintenance", color: "#14b8a6", activationDate: "2025-01-01", familyId: 1, isActive: true }
+  ],
+  serviceFamilies: [
+    { id: 1, name: "Home Services", description: "Professional home maintenance, repair, and improvement", icon: "Home", color: "#3b82f6", isActive: true, sortOrder: 1, createdAt: "2025-01-01" },
+    { id: 2, name: "Instant Delivery", description: "Fast on-demand delivery of goods, food, and parcels", icon: "Truck", color: "#f59e0b", isActive: false, sortOrder: 2, createdAt: "2025-01-01" },
+    { id: 3, name: "Scheduled Services", description: "Recurring and appointment-based professional services", icon: "Calendar", color: "#10b981", isActive: true, sortOrder: 3, createdAt: "2025-01-01" }
   ],
   users: [
     { id: 1, name: "Admin User", email: "admin@srvio.com", password: "admin123", phone: "555-0000", role: "ADMIN", preferredLanguage: "en", isVerified: true, joinDate: "2025-01-01T00:00:00Z" },
@@ -61,6 +66,19 @@ const defaultSeedData = {
   transactions: [],
   payouts: [],
   disputes: [],
+  disputeMessages: [],
+  disputeEvidence: [],
+  disputeTimeline: [],
+  serviceComments: [
+    { serviceId: 13, fromId: 1, fromName: "Admin User", fromRole: "ADMIN", message: "the image is not related to the service, please review", createdAt: "2026-05-15T05:20:28.987Z", id: 1 },
+    { serviceId: 13, fromId: 2, fromName: "Mike Provider", fromRole: "PROVIDER", message: "this is the image of Hana, i think it will encourage selecting the server, please accept", createdAt: "2026-05-15T05:23:25.724Z", id: 2 },
+    { id: 3, serviceId: 26, fromId: 8, fromName: "Harery CS", fromRole: "CUSTOMER_SERVICE", message: "Man ! show related image. call me when u have time", createdAt: "2026-05-15T05:52:26.976Z", edited: true, editedAt: "2026-05-15T06:15:43.466Z" }
+  ],
+  disputes: [],
+  disputeMessages: [],
+  disputeEvidence: [],
+  disputeTimeline: [],
+  imageBlobs: [],
   systemSettings: {
     reservationPercentage: 20,
     commissionTaxPercentage: 13,
@@ -69,7 +87,10 @@ const defaultSeedData = {
     customerFreeCancellationHours: 24,
     vendorFreeCancellationHours: 48,
     customerLateCancellationFee: 50,
-    vendorLateCancellationFee: 50
+    vendorLateCancellationFee: 50,
+    disputeWindowDays: 7,
+    mediationDurationHours: 48,
+    maxDisputeFiles: 20
   }
 };
 

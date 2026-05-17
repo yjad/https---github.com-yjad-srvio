@@ -8,18 +8,7 @@ import { useUIStore } from '@/store/uiStore';
 import { Card, Avatar, StarRating, Skeleton, Badge, ServiceImage, Button, ImageUpload, Modal } from '@/components/shared';
 import { cn } from '@/utils/cn';
 import { Search, SlidersHorizontal, X, Clock, Filter, Plus, Edit2 } from 'lucide-react';
-import type { Service } from '@/types';
-
-const categoryGradients: Record<number, string> = {
-  1: 'from-blue-400 to-blue-600',
-  2: 'from-green-400 to-green-600',
-  3: 'from-amber-400 to-amber-600',
-  4: 'from-purple-400 to-purple-600',
-  5: 'from-pink-400 to-pink-600',
-  6: 'from-teal-400 to-teal-600',
-};
-
-const categoryIcons = ['🔧', '🧹', '⚡', '🛠️', '🎨', '🌿'];
+import type { Service, Category } from '@/types';
 
 const verificationBadge: Record<string, string> = {
   approved: 'bg-accent-100 text-accent-700',
@@ -33,22 +22,36 @@ export default function ServiceListPage() {
   const { user } = useAuthStore();
   const { addNotification } = useUIStore();
   const queryClient = useQueryClient();
-  const { category, search, priceMin, priceMax, sortBy, setCategory, setSearch, setSortBy, resetFilters } = useFilterStore();
+  const { category, search, priceMin, priceMax, sortBy, setCategory, setSearch, setSortBy, setPriceRange, resetFilters, family, setFamily } = useFilterStore();
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     const cat = searchParams.get('category');
     const q = searchParams.get('search');
-    if (cat) setCategory(Number(cat));
-    if (q) setSearch(q);
+    const familyParam = searchParams.get('family');
+    const { family: curFamily, category: curCat, search: curSearch } = useFilterStore.getState();
+    if (cat && Number(cat) !== curCat) setCategory(Number(cat));
+    if (q && q !== curSearch) setSearch(q);
+    if (familyParam && Number(familyParam) !== curFamily) setFamily(Number(familyParam));
   }, [searchParams]);
+
+  useEffect(() => {
+    const sp = new URLSearchParams(searchParams);
+    if (category) sp.set('category', String(category)); else sp.delete('category');
+    if (search) sp.set('search', search); else sp.delete('search');
+    if (priceMin) sp.set('priceMin', String(priceMin)); else sp.delete('priceMin');
+    if (priceMax) sp.set('priceMax', String(priceMax)); else sp.delete('priceMax');
+    if (sortBy !== 'rating') sp.set('sortBy', sortBy); else sp.delete('sortBy');
+    if (family) sp.set('family', String(family)); else sp.delete('family');
+    navigate(`?${sp.toString()}`, { replace: true });
+  }, [category, search, priceMin, priceMax, sortBy, family]);
 
   const isProvider = user?.role === 'PROVIDER';
 
   const { data: services, isLoading } = useQuery({
-    queryKey: ['services', category, search, priceMin, priceMax, sortBy, isProvider ? user?.id : 'all'],
+    queryKey: ['services', category, search, priceMin, priceMax, sortBy, family, isProvider ? user?.id : 'all'],
     queryFn: () => mockApi.getServices({
-      category, search: search || undefined, priceMin, priceMax, sortBy,
+      category, familyId: family, search: search || undefined, priceMin, priceMax, sortBy,
       providerId: isProvider ? user!.id : null,
     }),
     enabled: !isProvider || !!user,
@@ -59,7 +62,12 @@ export default function ServiceListPage() {
     queryFn: () => mockApi.getCategories(),
   });
 
-  const hasActiveFilters = category || search || priceMin || priceMax || sortBy !== 'rating';
+  const { data: families } = useQuery({
+    queryKey: ['service-families'],
+    queryFn: () => mockApi.getServiceFamilies(),
+  });
+
+  const hasActiveFilters = category || search || priceMin || priceMax || sortBy !== 'rating' || family;
 
   // ── Provider: Add/Edit Service Modal ──
   const [showServiceModal, setShowServiceModal] = useState(false);
@@ -77,7 +85,7 @@ export default function ServiceListPage() {
       });
     },
     onSuccess: () => {
-      addNotification(editingServiceId ? 'Service updated — pending verification' : 'Service created!', 'success');
+      addNotification(editingServiceId ? 'Service updated — pending verification' : 'Service submitted for review', 'success');
       setShowServiceModal(false);
       setEditingServiceId(null);
       setServiceForm({ name: '', description: '', categoryId: 1, price: 0, priceUnit: 'per hour', duration: '1 hour', image: '' });
@@ -107,6 +115,34 @@ export default function ServiceListPage() {
           </Button>
         )}
       </div>
+
+      {/* Family Pills */}
+      {!isProvider && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            onClick={() => setFamily(null)}
+            className={cn(
+              'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+              !family ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            )}
+          >
+            All
+          </button>
+          {families?.map(f => (
+            <button
+              key={f.id}
+              onClick={() => setFamily(f.id)}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+                family === f.id ? 'text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              )}
+              style={family === f.id ? { backgroundColor: f.color } : undefined}
+            >
+              {f.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Search & Filter Bar */}
       {!isProvider && (
@@ -147,7 +183,9 @@ export default function ServiceListPage() {
                     onChange={e => setCategory(e.target.value ? Number(e.target.value) : null)}
                   >
                     <option value="">All Categories</option>
-                    {categories?.map(cat => <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>)}
+                    {categories
+                      ?.filter(c => !family || String(c.familyId) === String(family))
+                      .map(cat => <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -190,6 +228,11 @@ export default function ServiceListPage() {
               </div>
               {hasActiveFilters && (
                 <div className="flex flex-wrap gap-2 mt-4">
+                  {family && families && (
+                    <Badge className="flex items-center gap-1 cursor-pointer">
+                      {families.find(f => String(f.id) === String(family))?.name} <X className="w-3 h-3 ml-1" onClick={() => setFamily(null)} />
+                    </Badge>
+                  )}
                   {category && (
                     <Badge className="flex items-center gap-1 cursor-pointer" >
                       {categories?.find(c => c.id === category)?.icon} {categories?.find(c => c.id === category)?.name}
@@ -218,8 +261,8 @@ export default function ServiceListPage() {
           ? Array.from({ length: 6 }).map((_, i) => <ServiceCardSkeleton key={i} />)
           : services?.map(service => (
             isProvider
-              ? <ProviderServiceCard key={service.id} service={service} onEdit={() => { setEditingServiceId(service.id); setServiceForm({ name: service.name, description: service.description, categoryId: service.categoryId, price: service.price, priceUnit: service.priceUnit, duration: service.duration, image: service.image || '' }); setShowServiceModal(true); }} />
-              : <ServiceCard key={service.id} service={service} />
+              ? <ProviderServiceCard key={service.id} service={service} categories={categories} onEdit={() => { setEditingServiceId(service.id); setServiceForm({ name: service.name, description: service.description, categoryId: service.categoryId, price: service.price, priceUnit: service.priceUnit, duration: service.duration, image: service.image || '' }); setShowServiceModal(true); }} />
+              : <ServiceCard key={service.id} service={service} categories={categories} />
           ))
         }
       </div>
@@ -292,9 +335,9 @@ export default function ServiceListPage() {
   );
 }
 
-function ServiceCard({ service }: { service: Service }) {
-  const gradient = categoryGradients[service.categoryId] || 'from-gray-400 to-gray-500';
-  const icon = categoryIcons[service.categoryId - 1] || '🔧';
+function ServiceCard({ service, categories }: { service: Service; categories?: Category[] }) {
+  const cat = categories?.find(c => c.id === service.categoryId);
+  const icon = cat?.icon || '🔧';
 
   return (
     <Link to={`/services/${service.id}`}>
@@ -304,7 +347,7 @@ function ServiceCard({ service }: { service: Service }) {
             image={service.image}
             name={service.name}
             fallback={
-              <div className={`h-44 bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+              <div className="h-44 flex items-center justify-center" style={{ backgroundColor: cat?.color || '#6b7280' }}>
                 <span className="text-5xl group-hover:scale-110 transition-transform duration-300">{icon}</span>
               </div>
             }
@@ -335,9 +378,9 @@ function ServiceCard({ service }: { service: Service }) {
   );
 }
 
-function ProviderServiceCard({ service, onEdit }: { service: Service; onEdit: () => void }) {
-  const gradient = categoryGradients[service.categoryId] || 'from-gray-400 to-gray-500';
-  const icon = categoryIcons[service.categoryId - 1] || '🔧';
+function ProviderServiceCard({ service, onEdit, categories }: { service: Service; onEdit: () => void; categories?: Category[] }) {
+  const cat = categories?.find(c => c.id === service.categoryId);
+  const icon = cat?.icon || '🔧';
 
   return (
     <Card className="group hover:shadow-lg transition-all hover:-translate-y-0.5 cursor-pointer" onClick={onEdit}>
@@ -346,7 +389,7 @@ function ProviderServiceCard({ service, onEdit }: { service: Service; onEdit: ()
           image={service.image}
           name={service.name}
           fallback={
-            <div className={`h-44 bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+            <div className="h-44 flex items-center justify-center" style={{ backgroundColor: cat?.color || '#6b7280' }}>
               <span className="text-5xl group-hover:scale-110 transition-transform duration-300">{icon}</span>
             </div>
           }

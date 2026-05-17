@@ -3,7 +3,7 @@ export type BookingStatus = 'REQUESTED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETE
 export type PaymentStatus = 'UNPAID' | 'PARTIALLY_PAID' | 'PAYMENT_PENDING' | 'FULLY_PAID' | 'REFUNDED' | 'FAILED' | 'DISPUTED';
 export type PayoutStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'FAILED';
 export type TransactionType = 'RESERVATION' | 'FINAL_PAYMENT' | 'REFUND' | 'PENALTY';
-export type DisputeStatus = 'OPEN' | 'UNDER_REVIEW' | 'RESOLVED_PROVIDER' | 'RESOLVED_CUSTOMER' | 'CLOSED';
+export type DisputeStatus = 'OPEN' | 'UNDER_REVIEW' | 'MEDIATION' | 'ESCALATED' | 'RESOLVED' | 'REJECTED' | 'REFUNDED' | 'CLOSED';
 
 export interface User {
   id: number;
@@ -19,6 +19,17 @@ export interface User {
   preferredLanguage: string;
 }
 
+export interface ServiceFamily {
+  id: number;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
 export interface Category {
   id: number;
   name: string;
@@ -28,6 +39,7 @@ export interface Category {
   serviceCount: number;
   isActive?: boolean;
   activationDate?: string;
+  familyId?: number;
 }
 
 export interface Service {
@@ -48,6 +60,7 @@ export interface Service {
   createdAt: string;
   isActive?: boolean;
   verificationStatus?: 'approved' | 'pending' | 'rejected';
+  rejectionNote?: string;
 }
 
 export interface Booking {
@@ -95,6 +108,68 @@ export interface SystemSettings {
   vendorFreeCancellationHours: number;
   customerLateCancellationFee: number;
   vendorLateCancellationFee: number;
+  disputeWindowDays: number;
+  mediationDurationHours: number;
+  maxDisputeFiles: number;
+}
+
+export type DisputeCategory = 'SERVICE_NOT_DELIVERED' | 'POOR_QUALITY' | 'WRONG_PRICE' | 'DAMAGED_PROPERTY' | 'PROVIDER_NO_SHOW' | 'CUSTOMER_ABUSE' | 'INCOMPLETE_WORK' | 'PAYMENT_ISSUE' | 'OTHER';
+export type DisputeResolutionType = 'FULL_REFUND' | 'PARTIAL_REFUND' | 'REWORK' | 'PAYMENT_RELEASE' | 'ACCOUNT_REVIEW' | 'OTHER';
+export type AdminAction = 'APPROVE_REFUND' | 'REJECT_DISPUTE' | 'PARTIAL_SETTLEMENT' | 'REQUEST_MORE_INFO' | 'RELEASE_ESCROW' | 'CLOSE_CASE' | 'ESCALATE';
+
+export interface Dispute {
+  id: number;
+  bookingId: number;
+  raisedById: number;
+  raisedByRole: 'CUSTOMER' | 'PROVIDER';
+  disputeCategory: DisputeCategory;
+  title: string;
+  description: string;
+  requestedResolution: DisputeResolutionType;
+  status: DisputeStatus;
+  resolution?: {
+    type: DisputeResolutionType | 'NO_REFUND' | 'REWORK_APPROVED' | 'PROVIDER_PAID' | 'SPLIT_SETTLEMENT' | 'ACCOUNT_WARNING';
+    csComment: string;
+    financialSummary: string;
+    actorId: number;
+    timestamp: string;
+  };
+  holdAmount: number;
+  createdAt: string;
+  updatedAt: string;
+  closedAt?: string;
+}
+
+export interface DisputeMessage {
+  id: number;
+  disputeId: number;
+  fromId: number;
+  fromRole: UserRole;
+  message: string;
+  isInternalNote: boolean;
+  attachments?: string[];
+  createdAt: string;
+}
+
+export interface DisputeEvidence {
+  id: number;
+  disputeId: number;
+  uploaderId: number;
+  fileType: string;
+  fileName: string;
+  filePath: string;
+  checksum: string;
+  uploadedAt: string;
+}
+
+export interface DisputeTimelineEntry {
+  id: number;
+  disputeId: number;
+  action: string;
+  actorId: number;
+  actorRole: UserRole;
+  description: string;
+  createdAt: string;
 }
 
 export interface Review {
@@ -110,6 +185,27 @@ export interface Review {
   createdAt: string;
 }
 
+export interface ImageBlob {
+  id: number;
+  path: string;
+  data: string;
+  type: 'services' | 'avatars' | 'attachments';
+  createdAt: string;
+}
+
+export interface ServiceComment {
+  id: number;
+  serviceId: number;
+  fromId: number;
+  fromName: string;
+  fromRole: UserRole;
+  message: string;
+  attachments?: string[];
+  createdAt: string;
+  edited?: boolean;
+  editedAt?: string;
+}
+
 export interface AuthToken {
   userId: number;
   email: string;
@@ -119,6 +215,7 @@ export interface AuthToken {
 }
 
 export interface FilterState {
+  family: number | null;
   category: number | null;
   priceMin: number | null;
   priceMax: number | null;

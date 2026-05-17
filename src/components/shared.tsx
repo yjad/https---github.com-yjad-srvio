@@ -1,6 +1,8 @@
 import { cn } from '@/utils/cn';
-import { useState, useRef, type ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
-import { Loader2, Star, X, Check, AlertCircle, Search, ChevronUp, ChevronDown, ChevronsUpDown, Upload } from 'lucide-react';
+import { useState, useRef, useEffect, type ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
+import type { DisputeTimelineEntry } from '@/types';
+import { Loader2, Star, X, Check, AlertCircle, Search, ChevronUp, ChevronDown, ChevronsUpDown, Upload, Clock } from 'lucide-react';
+import { mockApi } from '@/api/mockApi';
 
 // ─── Button ────────────────────────────────────────────────
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -232,6 +234,51 @@ export function Modal({ isOpen, onClose, title, children }: { isOpen: boolean; o
   );
 }
 
+// ─── Dispute Status Badge ───────────────────────────────────
+const disputeStatusColors: Record<string, string> = {
+  OPEN: 'bg-blue-100 text-blue-700',
+  UNDER_REVIEW: 'bg-warning-100 text-warning-700',
+  MEDIATION: 'bg-purple-100 text-purple-700',
+  ESCALATED: 'bg-orange-100 text-orange-700',
+  RESOLVED: 'bg-accent-100 text-accent-700',
+  REJECTED: 'bg-danger-100 text-danger-700',
+  REFUNDED: 'bg-teal-100 text-teal-700',
+  CLOSED: 'bg-gray-100 text-gray-700',
+};
+
+export function DisputeStatusBadge({ status, className }: { status: string; className?: string }) {
+  return (
+    <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', disputeStatusColors[status] || 'bg-gray-100 text-gray-700', className)}>
+      {status.replace('_', ' ')}
+    </span>
+  );
+}
+
+// ─── Dispute Timeline ──────────────────────────────────────
+export function DisputeTimeline({ entries, className }: { entries: DisputeTimelineEntry[]; className?: string }) {
+  if (!entries || entries.length === 0) return null;
+  return (
+    <div className={cn('space-y-0', className)}>
+      {entries.map((entry, i) => (
+        <div key={entry.id} className="flex gap-3">
+          <div className="flex flex-col items-center">
+            <div className="w-2.5 h-2.5 rounded-full bg-primary-500 mt-1.5 ring-2 ring-white" />
+            {i < entries.length - 1 && <div className="w-0.5 flex-1 bg-gray-200" />}
+          </div>
+          <div className="pb-6 flex-1">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-medium text-gray-900">{entry.action}</span>
+              <span className="text-gray-400 text-xs flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(entry.createdAt).toLocaleString()}</span>
+            </div>
+            <p className="text-sm text-gray-600 mt-0.5">{entry.description}</p>
+            <p className="text-xs text-gray-400 mt-0.5">by {entry.actorRole} (ID: {entry.actorId})</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Notification Toast ────────────────────────────────────
 export function NotificationToast({ notifications, onRemove }: { notifications: { id: number; message: string; type: string }[]; onRemove: (id: number) => void }) {
   if (notifications.length === 0) return null;
@@ -253,13 +300,18 @@ export function NotificationToast({ notifications, onRemove }: { notifications: 
 
 // ─── Service Image ─────────────────────────────────────────
 export function ServiceImage({ image, name, fallback, className }: { image?: string | null; name: string; fallback?: ReactNode; className?: string }) {
+  const [resolved, setResolved] = useState<string | null>(null);
   const [hasError, setHasError] = useState(false);
-  const prevImage = useRef(image);
-  if (prevImage.current !== image) {
-    prevImage.current = image;
-    if (hasError) setHasError(false);
-  }
-  if (!image || hasError) {
+  useEffect(() => {
+    setHasError(false);
+    if (image?.startsWith('images/')) {
+      mockApi.getImageBlob(image).then(data => setResolved(data ?? null));
+    } else {
+      setResolved(image ?? null);
+    }
+  }, [image]);
+  const src = resolved ?? image;
+  if (!src || hasError) {
     return fallback ? <>{fallback}</> : (
       <div className={cn('bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center text-4xl font-bold text-white', className)}>
         {name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
@@ -269,7 +321,7 @@ export function ServiceImage({ image, name, fallback, className }: { image?: str
   return (
     <div className={cn('relative overflow-hidden bg-gray-200', className)}>
       <img
-        src={image}
+        src={src}
         alt={name}
         className="absolute inset-0 w-full h-full object-cover"
         onError={() => setHasError(true)}
@@ -279,12 +331,21 @@ export function ServiceImage({ image, name, fallback, className }: { image?: str
 }
 
 // ─── Image Upload ─────────────────────────────────────────
-export function ImageUpload({ value, onChange, label, error }: { value: string; onChange: (dataUrl: string) => void; label?: string; error?: string }) {
+export function ImageUpload({ value, onChange, label, error }: { value: string; onChange: (path: string) => void; label?: string; error?: string }) {
+  const [resolvedPreview, setResolvedPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const handleFile = (file: File) => {
+  useEffect(() => {
+    if (value?.startsWith('images/')) {
+      mockApi.getImageBlob(value).then(data => setResolvedPreview(data ?? null));
+    } else {
+      setResolvedPreview(value || null);
+    }
+  }, [value]);
+  const handleFile = async (file: File) => {
     if (!file.type.startsWith('image/')) return;
     const img = new Image();
-    img.onload = () => {
+    img.onload = async () => {
       const MAX = 400;
       let w = img.naturalWidth;
       let h = img.naturalHeight;
@@ -298,17 +359,25 @@ export function ImageUpload({ value, onChange, label, error }: { value: string; 
       canvas.height = h;
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(img, 0, 0, w, h);
-      onChange(canvas.toDataURL('image/jpeg', 0.7));
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      setUploading(true);
+      try {
+        const path = await mockApi.saveImage(dataUrl, 'services');
+        onChange(path);
+      } finally {
+        setUploading(false);
+      }
     };
     img.src = URL.createObjectURL(file);
   };
+  const preview = resolvedPreview ?? value;
   return (
     <div className="space-y-1.5">
       {label && <label className="block text-sm font-medium text-gray-700">{label}</label>}
       <div className="flex items-center gap-3">
-        {value && <img src={value} alt="Preview" className="w-16 h-16 rounded-lg object-cover border" />}
-        <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-          <Upload className="w-4 h-4" />{value ? 'Change' : 'Upload'}
+        {preview && <img src={preview} alt="Preview" className="w-16 h-16 rounded-lg object-cover border" />}
+        <button type="button" disabled={uploading} onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">
+          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}{uploading ? 'Uploading...' : value ? 'Change' : 'Upload'}
         </button>
         {value && <button type="button" onClick={() => onChange('')} className="text-sm text-danger-600 hover:underline">Remove</button>}
       </div>
@@ -346,6 +415,7 @@ interface DataTableProps<T> {
   isLoading?: boolean;
   emptyState?: ReactNode;
   className?: string;
+  onRowClick?: (row: T) => void;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -355,6 +425,7 @@ export function DataTable<T extends Record<string, any>>({
   isLoading,
   emptyState,
   className,
+  onRowClick,
 }: DataTableProps<T>) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
@@ -476,7 +547,7 @@ export function DataTable<T extends Record<string, any>>({
           <tbody className="divide-y divide-gray-100">
             {sortedData.length > 0 ? (
               sortedData.map((row, i) => (
-                <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                <tr key={i} className={cn('hover:bg-gray-50/50 transition-colors', onRowClick && 'cursor-pointer')} onClick={() => onRowClick?.(row)}>
                   {columns.map((col, j) => (
                     <td key={j} className={cn('px-4 py-3 text-gray-700', col.className)}>
                       {typeof col.accessor === 'function' ? col.accessor(row) : row[col.accessor as string]}

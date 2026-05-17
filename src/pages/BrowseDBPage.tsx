@@ -1,15 +1,16 @@
-import { useEffect, useState, useCallback } from 'react';
-import { ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ChevronDown, RefreshCw, RotateCcw, Download } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ChevronDown, RefreshCw, RotateCcw, Download, ImageIcon } from 'lucide-react';
 import { mockApi } from '@/api/mockApi';
 
 type SortConfig = Record<string, { col: string; asc: boolean } | null>;
 
-const collections = ['categories', 'users', 'services', 'bookings', 'reviews', 'transactions', 'payouts', 'disputes', 'systemSettings'];
+const collections = ['categories', 'users', 'services', 'bookings', 'reviews', 'transactions', 'payouts', 'disputes', 'systemSettings', 'serviceComments', 'serviceFamilies', 'imageBlobs'];
 
 export default function BrowseDBPage() {
   const [db, setDb] = useState<Record<string, unknown> | null>(null);
   const [sort, setSort] = useState<SortConfig>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const initialSnapshotRef = useRef<Record<string, unknown> | null>(null);
 
   const load = useCallback(async () => {
     const result: Record<string, unknown> = {};
@@ -20,6 +21,9 @@ export default function BrowseDBPage() {
       } catch {}
     }
     setDb(result);
+    if (initialSnapshotRef.current === null && Object.keys(result).length > 0) {
+      initialSnapshotRef.current = JSON.parse(JSON.stringify(result));
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -40,6 +44,99 @@ export default function BrowseDBPage() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  function downloadSeedFile(data: Record<string, unknown>, filename: string) {
+    const seedContent = `import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const dbPath = path.resolve(__dirname, 'db.json');
+
+const defaultSeedData = ${JSON.stringify(data, null, 2)};
+
+function seed() {
+  let needsSeeding = false;
+
+  if (!fs.existsSync(dbPath)) {
+    needsSeeding = true;
+  } else {
+    try {
+      const data = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+      if (!data || !data.users || data.users.length === 0) {
+        needsSeeding = true;
+      }
+    } catch (e) {
+      needsSeeding = true;
+    }
+  }
+
+  if (needsSeeding) {
+    console.log('Seeding database (db.json) with default data...');
+    fs.writeFileSync(dbPath, JSON.stringify(defaultSeedData, null, 2), 'utf8');
+    console.log('Database seeded successfully.');
+  } else {
+    console.log('Database already contains data. Skipping seed.');
+  }
+}
+
+seed();`;
+    const blob = new Blob([seedContent], { type: 'text/javascript' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const [migrating, setMigrating] = useState(false);
+  const [migrationProgress, setMigrationProgress] = useState('');
+
+  const migrateImages = useCallback(async () => {
+    setMigrating(true);
+    setMigrationProgress('Scanning services...');
+    try {
+      const services = await mockApi.getAllServices();
+      let count = 0;
+      for (const s of services) {
+        if (s.image && s.image.startsWith('data:image')) {
+          setMigrationProgress(`Migrating service #${s.id} image...`);
+          const path = await mockApi.saveImage(s.image, 'services');
+          await mockApi.updateService(s.id, { image: path });
+          count++;
+        }
+      }
+      setMigrationProgress(`Migrated ${count} service images. Scanning comment attachments...`);
+      const comments = await mockApi.getAllServiceComments();
+      let commentCount = 0;
+      for (const c of comments) {
+        if (c.attachments) {
+          let changed = false;
+          const newAttachments = await Promise.all(c.attachments.map(async (att) => {
+            if (att.startsWith('data:image')) {
+              const path = await mockApi.saveImage(att, 'attachments');
+              commentCount++;
+              changed = true;
+              return path;
+            }
+            return att;
+          }));
+          if (changed) {
+            await mockApi.updateServiceComment(c.id, { message: c.message, attachments: newAttachments });
+          }
+        }
+      }
+      setMigrationProgress(`Done! Migrated ${count} service images and ${commentCount} attachments.`);
+      load();
+    } catch (e) {
+      setMigrationProgress(`Error: ${e}`);
+    } finally {
+      setMigrating(false);
+    }
+  }, [load]);
 
   if (!db || Object.keys(db).length === 0) {
     return (
@@ -70,55 +167,24 @@ export default function BrowseDBPage() {
         </button>
         <button
           onClick={() => {
-            const seedContent = `import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const dbPath = path.resolve(__dirname, 'db.json');
-
-const defaultSeedData = ${JSON.stringify(db, null, 2)};
-
-function seed() {
-  let needsSeeding = false;
-
-  if (!fs.existsSync(dbPath)) {
-    needsSeeding = true;
-  } else {
-    try {
-      const data = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-      if (!data || !data.users || data.users.length === 0) {
-        needsSeeding = true;
-      }
-    } catch (e) {
-      needsSeeding = true;
-    }
-  }
-
-  if (needsSeeding) {
-    console.log('Seeding database (db.json) with default data...');
-    fs.writeFileSync(dbPath, JSON.stringify(defaultSeedData, null, 2), 'utf8');
-    console.log('Database seeded successfully.');
-  } else {
-    console.log('Database already contains data. Skipping seed.');
-  }
-}
-
-seed();`;
-            const blob = new Blob([seedContent], { type: 'text/javascript' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'seed.js';
-            a.click();
-            URL.revokeObjectURL(url);
+            const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            if (initialSnapshotRef.current && Object.keys(initialSnapshotRef.current).length > 0) {
+              downloadSeedFile(initialSnapshotRef.current, `seed-backup-${ts}.js`);
+            }
+            downloadSeedFile(db, 'seed.js');
           }}
           className="inline-flex items-center gap-1.5 text-sm text-emerald-600 hover:text-emerald-800 border border-emerald-300 rounded px-3 py-1 hover:bg-emerald-50"
         >
           <Download className="w-4 h-4" /> Replace Seed
         </button>
+        <button
+          onClick={migrateImages}
+          disabled={migrating}
+          className="inline-flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 border border-purple-300 rounded px-3 py-1 hover:bg-purple-50 disabled:opacity-50"
+        >
+          <ImageIcon className="w-4 h-4" /> {migrating ? 'Migrating...' : 'Migrate Images'}
+        </button>
+        {migrationProgress && <span className="text-sm text-gray-500">{migrationProgress}</span>}
       </div>
       {Object.entries(db).map(([key, value]) => {
         const isObj = !Array.isArray(value) && typeof value === 'object' && value !== null;

@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
 import { Avatar } from '@/components/shared';
-import { Menu, X, Home, Briefcase, Calendar, User, LogOut, LayoutDashboard, Shield, Settings, ChevronDown, LifeBuoy } from 'lucide-react';
+import { Menu, X, Home, Briefcase, Calendar, User, LogOut, LayoutDashboard, Shield, Settings, ChevronDown, LifeBuoy, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -38,6 +38,7 @@ export default function Navbar() {
       navLinks.push({ path: '/customer-service', label: t('nav.support', 'Support'), icon: LifeBuoy });
       navLinks.push({ path: '/bookings', label: t('nav.bookings'), icon: Calendar });
     }
+    navLinks.push({ path: '/disputes', label: 'Disputes', icon: ShieldAlert });
   }
 
   return (
@@ -125,9 +126,14 @@ export default function Navbar() {
                             </>
                           )}
                           {user.role === 'CUSTOMER_SERVICE' && (
-                            <Link to="/customer-service" onClick={() => setProfileOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                              <LifeBuoy className="w-4 h-4" /> Support
-                            </Link>
+                            <>
+                              <Link to="/customer-service" onClick={() => setProfileOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                <LifeBuoy className="w-4 h-4" /> Support
+                              </Link>
+                              <Link to="/customer-service/disputes" onClick={() => setProfileOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                <ShieldAlert className="w-4 h-4" /> Disputes
+                              </Link>
+                            </>
                           )}
                           <Link to="/settings" onClick={() => setProfileOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <Settings className="w-4 h-4" /> {t('nav.settings')}

@@ -16,13 +16,19 @@ import {
 import { Users, Briefcase, DollarSign, CheckCircle, AlertCircle, TrendingUp, Shield, Star } from 'lucide-react';
 import { useState } from 'react';
 import { Card, Badge, Avatar, PageHeader, Skeleton, Modal, DataTable, Button, ServiceImage, ImageUpload, type Column } from '@/components/shared';
-import type { User, Service, Booking } from '@/types';
+import type { User, Service, Booking, UserRole, ServiceFamily } from '@/types';
+import { adminCreateUserSchema } from '@/schemas';
+import { useUIStore } from '@/store/uiStore';
+import { useAuthStore } from '@/store/authStore';
+import ServiceApprovalsPanel from '@/components/ServiceApprovalsPanel';
 
 const COLORS = ['#3b82f6', '#22c55e', '#8b5cf6', '#f59e0b', '#ef4444'];
 
 export default function AdminDashboardPage() {
+  const { addNotification } = useUIStore();
+  const { user: adminUser } = useAuthStore();
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'users' | 'bookings' | 'reviews' | 'services' | 'categories' | 'financials'
+    'overview' | 'users' | 'bookings' | 'reviews' | 'services' | 'approvals' | 'families' | 'categories' | 'financials'
   >('overview');
 
   const { data: stats, isLoading } = useQuery({
@@ -30,17 +36,23 @@ export default function AdminDashboardPage() {
     queryFn: () => mockApi.getAdminStats(),
   });
 
-  const { data: services } = useQuery({ queryKey: ['services'], queryFn: () => mockApi.getServices() });
+  const { data: services } = useQuery({ queryKey: ['admin-all-services'], queryFn: () => mockApi.getAllServices() });
   const { data: categories } = useQuery({ queryKey: ['all-categories'], queryFn: () => mockApi.getAllCategories() });
   const { data: users } = useQuery({ queryKey: ['admin-users'], queryFn: () => mockApi.getAllUsers() });
   const { data: allBookings } = useQuery({ queryKey: ['admin-bookings'], queryFn: () => mockApi.getAllBookings() });
   const { data: allReviews } = useQuery({ queryKey: ['admin-reviews'], queryFn: () => mockApi.getAllReviews() });
   const { data: transactions } = useQuery({ queryKey: ['admin-transactions'], queryFn: () => mockApi.getTransactions() });
+  const { data: pendingServices } = useQuery({ queryKey: ['pending-services'], queryFn: () => mockApi.getPendingServices() });
+  const pendingCount = pendingServices?.length || 0;
+  const { data: families } = useQuery({ queryKey: ['admin-families'], queryFn: () => mockApi.getAllServiceFamilies() });
   const queryClient = useQueryClient();
 
   const toggleService = useMutation({
     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) => mockApi.updateService(id, { isActive }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['services'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-all-services'] });
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+    },
   });
 
   const toggleCategory = useMutation({
@@ -65,6 +77,31 @@ export default function AdminDashboardPage() {
     },
   });
 
+  const [showAddFamily, setShowAddFamily] = useState(false);
+  const [editFamily, setEditFamily] = useState<ServiceFamily | null>(null);
+  const createFamily = useMutation({
+    mutationFn: (data: Partial<ServiceFamily>) => mockApi.createServiceFamily(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-families'] });
+      setShowAddFamily(false);
+    },
+  });
+  const updateFamily = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<ServiceFamily> }) => mockApi.updateServiceFamily(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-families'] });
+      setEditFamily(null);
+    },
+  });
+  const deleteFamily = useMutation({
+    mutationFn: (id: number) => mockApi.deleteServiceFamily(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-families'] }),
+  });
+  const toggleFamily = useMutation({
+    mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) => mockApi.updateServiceFamily(id, { isActive }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-families'] }),
+  });
+
   const [editUser, setEditUser] = useState<User | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showServiceModal, setShowServiceModal] = useState(false);
@@ -82,6 +119,7 @@ export default function AdminDashboardPage() {
       });
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-all-services'] });
       queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
       setShowServiceModal(false);
@@ -95,6 +133,7 @@ export default function AdminDashboardPage() {
       return mockApi.updateService(editingService.id, serviceForm);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-all-services'] });
       queryClient.invalidateQueries({ queryKey: ['services'] });
       setEditingService(null);
       setShowServiceModal(false);
@@ -107,6 +146,32 @@ export default function AdminDashboardPage() {
       setEditUser(null);
     },
   });
+
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [addUserRole, setAddUserRole] = useState<UserRole>('CUSTOMER');
+  const [addUserErrors, setAddUserErrors] = useState<Record<string, string>>({});
+  const [addUserForm, setAddUserForm] = useState({ name: '', email: '', password: '', phone: '', preferredLanguage: 'en' });
+
+  const createUserMutation = useMutation({
+    mutationFn: () => mockApi.adminCreateUser({ ...addUserForm, role: addUserRole }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
+      setShowAddUser(false);
+      setAddUserForm({ name: '', email: '', password: '', phone: '', preferredLanguage: 'en' });
+      setAddUserErrors({});
+    },
+    onError: (err: Error) => {
+      setAddUserErrors({ email: err.message });
+    },
+  });
+
+  function openAddUser(role: UserRole) {
+    setAddUserRole(role);
+    setAddUserForm({ name: '', email: '', password: '', phone: '', preferredLanguage: 'en' });
+    setAddUserErrors({});
+    setShowAddUser(true);
+  }
   if (isLoading) {
     return (
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
@@ -134,7 +199,7 @@ export default function AdminDashboardPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit overflow-x-auto">
-        {(['overview', 'users', 'bookings', 'reviews', 'services', 'categories', 'financials'] as const).map(tab => (
+        {(['overview', 'users', 'bookings', 'reviews', 'services', 'approvals', 'families', 'categories', 'financials'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -144,6 +209,9 @@ export default function AdminDashboardPage() {
               }`}
           >
             {tab}
+            {tab === 'approvals' && pendingCount > 0 && (
+              <span className="ml-1.5 bg-warning-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{pendingCount}</span>
+            )}
           </button>
         ))}
       </div>
@@ -173,6 +241,20 @@ export default function AdminDashboardPage() {
       {/* Users */}
       {activeTab === 'users' && (
         <div className="space-y-4 animate-fade-in">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-gray-900">All Users</h2>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="primary" size="sm" onClick={() => openAddUser('ADMIN')}>
+                + Add Admin
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => openAddUser('CUSTOMER')}>
+                + Add Customer
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => openAddUser('CUSTOMER_SERVICE')}>
+                + Add Customer Service
+              </Button>
+            </div>
+          </div>
           <DataTable
             data={users || []}
             columns={[
@@ -230,8 +312,14 @@ export default function AdminDashboardPage() {
               },
               { header: 'Name', accessor: 'name', sortable: true },
               { header: 'Provider', accessor: 'providerName', sortable: true },
-              { header: 'Category', accessor: 'categoryId', sortable: true },
+              { header: 'Category', accessor: (s: Service) => { const cat = categories?.find(c => String(c.id) === String(s.categoryId)); return cat ? cat.name : s.categoryId; }, sortable: true, sortKey: 'categoryId' },
               { header: 'Price', accessor: (s: Service) => `$${s.price}`, sortable: true, sortKey: 'price' },
+              { header: 'Verification', accessor: (s: Service) => {
+                const v = s.verificationStatus;
+                if (!v) return <span className="text-gray-400">&mdash;</span>;
+                const colors: Record<string, string> = { approved: 'bg-accent-100 text-accent-700', pending: 'bg-warning-100 text-warning-600', rejected: 'bg-danger-100 text-danger-700' };
+                return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${colors[v] || 'bg-gray-100 text-gray-600'}`}>{v}</span>;
+              }, sortable: true, sortKey: 'verificationStatus' },
               { header: 'Status', accessor: (s: Service) => <Badge>{s.isActive ? 'Active' : 'Inactive'}</Badge>, sortable: true, sortKey: 'isActive' },
               {
                 header: 'Actions',
@@ -310,6 +398,47 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+      {/* Approvals */}
+      {activeTab === 'approvals' && (
+        <div className="animate-fade-in">
+          <ServiceApprovalsPanel currentUserId={adminUser?.id || 1} currentUserRole="ADMIN" currentUserName={adminUser?.name || 'Admin'} />
+        </div>
+      )}
+
+      {/* Families */}
+      {activeTab === 'families' && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Service Families</h2>
+            <Button onClick={() => setShowAddFamily(true)}>Add Family</Button>
+          </div>
+          <DataTable
+            data={families || []}
+            columns={[
+              { header: 'ID', accessor: (f: ServiceFamily) => <span className="font-mono text-xs">#{f.id}</span>, sortable: true, sortKey: 'id' },
+              { header: 'Icon', accessor: 'icon' },
+              { header: 'Name', accessor: 'name', sortable: true },
+              { header: 'Description', accessor: 'description', className: 'max-w-xs truncate' },
+              { header: 'Color', accessor: (f: ServiceFamily) => <span className="inline-block w-4 h-4 rounded-full" style={{ backgroundColor: f.color }} /> },
+              { header: 'Sort Order', accessor: 'sortOrder', sortable: true },
+              { header: 'Status', accessor: (f: ServiceFamily) => <Badge>{f.isActive ? 'Active' : 'Inactive'}</Badge>, sortable: true, sortKey: 'isActive' },
+              {
+                header: 'Actions',
+                accessor: (f: ServiceFamily) => (
+                  <div className="flex items-center gap-2">
+                    <button className="text-sm text-blue-600 underline" onClick={() => toggleFamily.mutate({ id: f.id, isActive: !f.isActive })}>
+                      {f.isActive ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button className="text-sm text-blue-600 underline" onClick={() => setEditFamily(f)}>Edit</button>
+                    <button className="text-sm text-red-600 underline" onClick={() => { if (window.confirm('Delete this family? Categories in it will be unlinked.')) deleteFamily.mutate(f.id); }}>Delete</button>
+                  </div>
+                ),
+              },
+            ]}
+          />
+        </div>
+      )}
+
       {/* Categories */}
       {activeTab === 'categories' && (
         <div className="space-y-4 animate-fade-in">
@@ -331,6 +460,7 @@ export default function AdminDashboardPage() {
               { header: 'Description', accessor: 'description', className: 'max-w-xs truncate' },
               { header: 'Color', accessor: (c: Category) => <span className="inline-block w-4 h-4 rounded-full" style={{ backgroundColor: c.color }}></span> },
               { header: 'Activation Date', accessor: 'activationDate', sortable: true },
+              { header: 'Family', accessor: (c: Category) => { const f = families?.find(f => String(f.id) === String(c.familyId)); return f ? f.name : <span className="text-gray-400">—</span>; } },
               { header: 'Status', accessor: (c: Category) => <Badge>{c.isActive ? 'Active' : 'Inactive'}</Badge>, sortable: true, sortKey: 'isActive' },
               {
                 header: 'Actions',
@@ -438,6 +568,102 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+      <Modal isOpen={showAddFamily} onClose={() => setShowAddFamily(false)} title="Add Family">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.currentTarget);
+            createFamily.mutate({
+              name: formData.get('name') as string,
+              description: formData.get('description') as string,
+              icon: formData.get('icon') as string,
+              color: formData.get('color') as string,
+              sortOrder: formData.get('sortOrder') ? Number(formData.get('sortOrder')) : 0,
+              isActive: true,
+            });
+          }}
+          className="space-y-4"
+        >
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Name</label>
+            <input name="name" required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Description</label>
+            <textarea name="description" required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Icon (lucide name)</label>
+            <input name="icon" required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" placeholder="Home" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Color</label>
+            <input type="color" name="color" required className="mt-1 block w-full h-10 border border-gray-300 rounded-md" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Sort Order</label>
+            <input type="number" name="sortOrder" className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="secondary" onClick={() => setShowAddFamily(false)}>Cancel</Button>
+            <Button type="submit" loading={createFamily.isPending}>Add Family</Button>
+          </div>
+        </form>
+      </Modal>
+      <Modal isOpen={!!editFamily} onClose={() => setEditFamily(null)} title="Edit Family">
+        {editFamily && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              updateFamily.mutate({
+                id: editFamily.id,
+                data: {
+                  name: formData.get('name') as string,
+                  description: formData.get('description') as string,
+                  icon: formData.get('icon') as string,
+                  color: formData.get('color') as string,
+                  sortOrder: formData.get('sortOrder') ? Number(formData.get('sortOrder')) : 0,
+                  isActive: formData.get('isActive') === 'true',
+                },
+              });
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Name</label>
+              <input name="name" defaultValue={editFamily.name} required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Description</label>
+              <textarea name="description" defaultValue={editFamily.description} required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Icon (lucide name)</label>
+              <input name="icon" defaultValue={editFamily.icon} required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" placeholder="Home" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Color</label>
+              <input type="color" name="color" defaultValue={editFamily.color} required className="mt-1 block w-full h-10 border border-gray-300 rounded-md" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Sort Order</label>
+              <input type="number" name="sortOrder" defaultValue={editFamily.sortOrder} className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Status</label>
+              <select name="isActive" defaultValue={String(editFamily.isActive)} className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="secondary" onClick={() => setEditFamily(null)}>Cancel</Button>
+              <Button type="submit" loading={updateFamily.isPending}>Save</Button>
+            </div>
+          </form>
+        )}
+      </Modal>
       <Modal isOpen={showAddCategory} onClose={() => setShowAddCategory(false)} title="Add Category">
         <form
           onSubmit={(e) => {
@@ -449,6 +675,7 @@ export default function AdminDashboardPage() {
               description: formData.get('description') as string,
               color: formData.get('color') as string,
               activationDate: formData.get('activationDate') as string || new Date().toISOString().split('T')[0],
+              familyId: formData.get('familyId') ? Number(formData.get('familyId')) : undefined,
             });
           }}
           className="space-y-4"
@@ -473,6 +700,13 @@ export default function AdminDashboardPage() {
             <label className="block text-sm font-medium text-gray-700">Activation Date</label>
             <input type="date" name="activationDate" defaultValue={new Date().toISOString().split('T')[0]} className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Family</label>
+            <select name="familyId" className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+              <option value="">None</option>
+              {families?.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+          </div>
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="secondary" onClick={() => setShowAddCategory(false)}>Cancel</Button>
             <Button type="submit" loading={createCategory.isPending}>
@@ -496,6 +730,7 @@ export default function AdminDashboardPage() {
                   color: formData.get('color') as string,
                   activationDate: formData.get('activationDate') as string,
                   isActive: formData.get('isActive') === 'true',
+                  familyId: formData.get('familyId') ? Number(formData.get('familyId')) : undefined,
                 },
               });
             }}
@@ -520,6 +755,13 @@ export default function AdminDashboardPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700">Activation Date</label>
               <input type="date" name="activationDate" defaultValue={editCategory.activationDate} className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Family</label>
+              <select name="familyId" defaultValue={editCategory.familyId || ''} className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                <option value="">None</option>
+                {families?.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Status</label>
@@ -713,6 +955,101 @@ export default function AdminDashboardPage() {
             </div>
           </form>
         )}
+      </Modal>
+
+      {/* Add User Modal */}
+      <Modal isOpen={showAddUser} onClose={() => setShowAddUser(false)} title={`Add New ${addUserRole === 'ADMIN' ? 'Admin' : addUserRole === 'CUSTOMER_SERVICE' ? 'Customer Service Agent' : 'Customer'}`}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const result = adminCreateUserSchema.safeParse({ ...addUserForm, role: addUserRole });
+            if (!result.success) {
+              const errs: Record<string, string> = {};
+              result.error.issues.forEach(issue => {
+                const key = issue.path.join('.');
+                if (key) errs[key] = issue.message;
+              });
+              setAddUserErrors(errs);
+              return;
+            }
+            setAddUserErrors({});
+            createUserMutation.mutate();
+          }}
+          className="space-y-4"
+        >
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Role</label>
+            <select
+              value={addUserRole}
+              onChange={e => setAddUserRole(e.target.value as UserRole)}
+              className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+            >
+              <option value="CUSTOMER">Customer</option>
+              <option value="CUSTOMER_SERVICE">Customer Service</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Full Name</label>
+            <input
+              value={addUserForm.name}
+              onChange={e => setAddUserForm(f => ({ ...f, name: e.target.value }))}
+              required
+              className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+            />
+            {addUserErrors.name && <p className="text-xs text-red-500 mt-1">{addUserErrors.name}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Email</label>
+            <input
+              type="email"
+              value={addUserForm.email}
+              onChange={e => setAddUserForm(f => ({ ...f, email: e.target.value }))}
+              required
+              className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+            />
+            {addUserErrors.email && <p className="text-xs text-red-500 mt-1">{addUserErrors.email}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Phone</label>
+            <input
+              type="tel"
+              value={addUserForm.phone}
+              onChange={e => setAddUserForm(f => ({ ...f, phone: e.target.value }))}
+              required
+              className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+            />
+            {addUserErrors.phone && <p className="text-xs text-red-500 mt-1">{addUserErrors.phone}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Password</label>
+            <input
+              type="password"
+              value={addUserForm.password}
+              onChange={e => setAddUserForm(f => ({ ...f, password: e.target.value }))}
+              required
+              className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+            />
+            {addUserErrors.password && <p className="text-xs text-red-500 mt-1">{addUserErrors.password}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Language</label>
+            <select
+              value={addUserForm.preferredLanguage}
+              onChange={e => setAddUserForm(f => ({ ...f, preferredLanguage: e.target.value }))}
+              className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+            >
+              <option value="en">English</option>
+              <option value="fr">Français</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="secondary" onClick={() => setShowAddUser(false)}>Cancel</Button>
+            <Button type="submit" loading={createUserMutation.isPending}>
+              Create User
+            </Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

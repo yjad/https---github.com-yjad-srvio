@@ -8,12 +8,6 @@ import { Avatar, StarRating, Button, Skeleton, Card, Badge, Modal, ServiceImage 
 import { bookingSchema } from '@/schemas';
 import { Clock, MapPin, Star, ArrowLeft, Shield, MessageSquare } from 'lucide-react';
 
-const categoryGradients: Record<number, string> = {
-  1: 'from-blue-400 to-blue-600', 2: 'from-green-400 to-green-600', 3: 'from-amber-400 to-amber-600',
-  4: 'from-purple-400 to-purple-600', 5: 'from-pink-400 to-pink-600', 6: 'from-teal-400 to-teal-600',
-};
-const categoryIcons = ['🔧', '🧹', '⚡', '🛠️', '🎨', '🌿'];
-
 export default function ServiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -50,6 +44,9 @@ export default function ServiceDetailPage() {
     queryKey: ['system-settings'],
     queryFn: () => mockApi.getSystemSettings(),
   });
+
+  const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: () => mockApi.getCategories() });
+  const { data: families } = useQuery({ queryKey: ['service-families'], queryFn: () => mockApi.getServiceFamilies() });
 
   const bookingMutation = useMutation({
     mutationFn: async (data: typeof bookingForm) => {
@@ -112,14 +109,35 @@ export default function ServiceDetailPage() {
     );
   }
 
-  const gradient = categoryGradients[service.categoryId] || 'from-gray-400 to-gray-500';
-  const icon = categoryIcons[service.categoryId - 1] || '🔧';
+  const serviceCategory = categories?.find(c => c.id === service.categoryId);
+  const gradient = serviceCategory?.color ? `from-${serviceCategory.color}-400 to-${serviceCategory.color}-600` : 'from-gray-400 to-gray-500';
+  const icon = serviceCategory?.icon || '🔧';
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
       <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-500 hover:text-gray-900 mb-6 text-sm font-medium">
         <ArrowLeft className="w-4 h-4" /> Back
       </button>
+
+      {/* Breadcrumb */}
+      {(() => {
+        const cat = categories?.find(c => c.id === service?.categoryId);
+        const fam = cat?.familyId ? families?.find(f => String(f.id) === String(cat.familyId)) : null;
+        if (!cat) return null;
+        return (
+          <nav className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+            {fam && fam.isActive ? (
+              <>
+                <Link to={`/services?family=${fam.id}`} className="hover:text-primary-600 transition-colors">{fam.name}</Link>
+                <span>/</span>
+                <Link to={`/services?family=${fam.id}&category=${cat.id}`} className="hover:text-primary-600 transition-colors">{cat.name}</Link>
+              </>
+            ) : (
+              <span>{cat.name}</span>
+            )}
+          </nav>
+        );
+      })()}
 
       <div className="grid md:grid-cols-2 gap-8 mb-10">
         {/* Image */}
@@ -138,7 +156,7 @@ export default function ServiceDetailPage() {
 
         {/* Info */}
         <div>
-          <Badge className="mb-3">{service.categoryId && categoryIcons[service.categoryId - 1]} Service</Badge>
+          <Badge className="mb-3">{categories?.find(c => c.id === service.categoryId)?.icon || ''} Service</Badge>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{service.name}</h1>
           <div className="flex items-center gap-3 mb-4">
             <StarRating rating={service.rating} size="md" />

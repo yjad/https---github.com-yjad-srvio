@@ -16,6 +16,9 @@ import ProviderDashboardPage from '@/pages/ProviderDashboardPage';
 import AdminDashboardPage from '@/pages/AdminDashboardPage';
 import CustomerDashboardPage from '@/pages/CustomerDashboardPage';
 import CustomerServiceDashboardPage from '@/pages/CustomerServiceDashboardPage';
+import DisputesPage from '@/pages/DisputesPage';
+import DisputeDetailPage from '@/pages/DisputeDetailPage';
+import CSDisputesPage from '@/pages/CSDisputesPage';
 import ProfilePage from '@/pages/ProfilePage';
 import AdminSettingsPage from '@/pages/AdminSettingsPage';
 import BrowseDBPage from '@/pages/BrowseDBPage';
@@ -99,6 +102,23 @@ export default function App() {
                   <CustomerServiceDashboardPage />
                 </ProtectedRoute>
               } />
+              <Route path="/customer-service/disputes" element={
+                <ProtectedRoute role="CUSTOMER_SERVICE">
+                  <CSDisputesPage />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/disputes" element={
+                <ProtectedRoute>
+                  <DisputesPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/disputes/:id" element={
+                <ProtectedRoute>
+                  <DisputeDetailPage />
+                </ProtectedRoute>
+              } />
+
               <Route path="/browsedb" element={<BrowseDBPage />} />
             </Routes>
           </main>

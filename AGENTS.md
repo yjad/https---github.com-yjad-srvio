@@ -307,7 +307,7 @@ All methods are async HTTP calls to json-server on port 3000. Data persists in `
 
 ```ts
 loginSchema       → { email, password }
-registerSchema    → { name, email, password, phone, role: 'USER' | 'PROVIDER' }
+registerSchema    → { name, email, password, phone, role: 'CUSTOMER' | 'PROVIDER' }
 bookingSchema     → { serviceId, date, time, address, notes? }
 reviewSchema      → { bookingId, rating: 1-5, comment }
 serviceSchema     → { name, description, categoryId, price, priceUnit, duration }
@@ -470,6 +470,8 @@ const mutation = useMutation({
 
 | Issue | Fix |
 |-------|-----|
+| `json-server` v1 generates UUID string IDs on POST | Always include `id: await nextId('collectionName')` before any POST body. `nextId()` helper in `mockApi.ts` computes `max(id) + 1` skipping non-numeric IDs |
+| All entity IDs must be integers | Never rely on json-server auto-ID. Every POST must explicitly set `id` as a number. See `nextId()` in `mockApi.ts` |
 | Recharts `Tooltip.formatter` type error | Cast: `(value: unknown) => [...] as [string, string]` |
 | `issue.path[0]` type is `symbol` | Use `issue.path.join('.')` or `String(issue.path[0])` |
 | `useSearchParams` ≠ Zustand filter sync | Use `useEffect` to read params → set store |
@@ -478,7 +480,7 @@ const mutation = useMutation({
 | Tailwind v4 has no config file | All custom values in `@theme` block in `index.css` |
 | Vite single-file inlines everything | Output is one `dist/index.html` — no separate assets |
 | Token expires after 24h | `init()` auto-logs out expired users |
-| `role` type narrow conflicts | Use `role: 'USER' \| 'PROVIDER'` explicit union, not `as const` |
+| `role` type narrow conflicts | Use `role: 'CUSTOMER' \| 'PROVIDER'` explicit union, not `as const` |
 
 ---
 

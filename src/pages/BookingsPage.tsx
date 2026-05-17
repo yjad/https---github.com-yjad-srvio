@@ -5,7 +5,7 @@ import { mockApi } from '@/api/mockApi';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
 import { Card, Badge, Button, Avatar, EmptyState, PageHeader, Skeleton, Modal } from '@/components/shared';
-import { Calendar, Clock, MapPin, FileText, Star, ChevronDown } from 'lucide-react';
+import { Calendar, Clock, MapPin, FileText, Star, ChevronDown, ShieldAlert } from 'lucide-react';
 import { PaymentModal } from '@/components/PaymentModal';
 import { TransactionType } from '@/types';
 
@@ -183,6 +183,13 @@ export default function BookingsPage() {
                     }}>
                       <Star className="w-4 h-4 mr-1" /> Leave Review
                     </Button>
+                  )}
+                  {(user?.role === 'CUSTOMER' || user?.role === 'PROVIDER') && booking.status === 'COMPLETED' && (
+                    <Link to={`/disputes?create&bookingId=${booking.id}`}>
+                      <Button size="sm" variant="outline">
+                        <ShieldAlert className="w-4 h-4 mr-1" /> Dispute
+                      </Button>
+                    </Link>
                   )}
                   {user?.role === 'CUSTOMER' && booking.status === 'REQUESTED' && (
                     <Button size="sm" variant="danger" onClick={() => statusMutation.mutate({ id: booking.id, status: 'CANCELLED' })} loading={statusMutation.isPending}>Cancel</Button>

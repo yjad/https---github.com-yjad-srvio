@@ -5,15 +5,16 @@ import { useUIStore } from '@/store/uiStore';
 import { Card, Badge, Button, Avatar, StarRating, PageHeader, ServiceImage, ImageUpload } from '@/components/shared';
 import { serviceSchema, type ServiceInput } from '@/schemas';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Plus, DollarSign, Briefcase, CheckCircle, Clock, Calendar, MapPin, ChevronDown, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, DollarSign, Briefcase, CheckCircle, Clock, Calendar, MapPin, ChevronDown, Edit2, Trash2, X, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
-import type { Booking } from '@/types';
+import type { Booking, Service } from '@/types';
+import ServiceCommentThread from '@/components/ServiceCommentThread';
 
 export default function ProviderDashboardPage() {
   const { user } = useAuthStore();
   const { addNotification } = useUIStore();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'overview' | 'bookings' | 'services'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'bookings' | 'services' | 'reviews'>('overview');
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [editingServiceId, setEditingServiceId] = useState<number | null>(null);
   const [expandedBooking, setExpandedBooking] = useState<number | null>(null);
@@ -37,6 +38,7 @@ export default function ProviderDashboardPage() {
   });
 
   const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: () => mockApi.getCategories() });
+  const { data: families } = useQuery({ queryKey: ['service-families'], queryFn: () => mockApi.getServiceFamilies() });
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: Booking['status'] }) => mockApi.updateBookingStatus(id, status),
@@ -69,7 +71,7 @@ export default function ProviderDashboardPage() {
       });
     },
     onSuccess: () => {
-      addNotification(editingServiceId ? 'Service updated!' : 'Service created!', 'success');
+      addNotification(editingServiceId ? 'Service updated!' : 'Service submitted for review', 'success');
       setShowServiceModal(false);
       setEditingServiceId(null);
       setServiceForm({ name: '', description: '', categoryId: 1, price: 0, priceUnit: 'per hour', duration: '1 hour', image: '' });
@@ -100,7 +102,7 @@ export default function ProviderDashboardPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
-        {(['overview', 'bookings', 'services'] as const).map(tab => (
+        {(['overview', 'bookings', 'services', 'reviews'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${activeTab === tab ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
             {tab}
@@ -271,6 +273,42 @@ export default function ProviderDashboardPage() {
         </div>
       )}
 
+      {/* Reviews Tab */}
+      {activeTab === 'reviews' && (
+        <div className="space-y-4 animate-fade-in">
+          {services && services.filter(s => s.verificationStatus === 'pending' || s.verificationStatus === 'rejected').length > 0 ? (
+            services.filter(s => s.verificationStatus === 'pending' || s.verificationStatus === 'rejected').map(svc => (
+              <Card key={svc.id} className="p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <ServiceImage image={svc.image} name={svc.name} className="w-14 h-14 rounded-lg shrink-0" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-900">{svc.name}</h3>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${svc.verificationStatus === 'pending' ? 'bg-warning-100 text-warning-600' : 'bg-danger-100 text-danger-700'}`}>
+                        {svc.verificationStatus}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">${svc.price} / {svc.priceUnit}</p>
+                  </div>
+                </div>
+                <ServiceCommentThread
+                  serviceId={svc.id}
+                  currentUserId={user.id}
+                  currentUserRole="PROVIDER"
+                  currentUserName={user.name}
+                  allowAttachments
+                />
+              </Card>
+            ))
+          ) : (
+            <Card className="p-8 text-center text-gray-500">
+              <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p>No service reviews yet. All your services have been reviewed.</p>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Service Modal */}
       {showServiceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -298,7 +336,26 @@ export default function ProviderDashboardPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                   <select className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                     value={serviceForm.categoryId} onChange={e => setServiceForm({ ...serviceForm, categoryId: Number(e.target.value) })}>
-                    {categories?.map(cat => <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>)}
+                    <option value="">Select a category</option>
+                    {(() => {
+                      const activeFamilies = families?.filter(f => f.isActive) || [];
+                      const grouped = new Map<number | null, typeof categories>();
+                      categories?.forEach(c => {
+                        const key = c.familyId && activeFamilies.some(f => String(f.id) === String(c.familyId)) ? c.familyId : null;
+                        if (!grouped.has(key)) grouped.set(key, []);
+                        grouped.get(key)!.push(c);
+                      });
+                      const result: JSX.Element[] = [];
+                      for (const [familyId, cats] of grouped) {
+                        if (familyId === null) {
+                          result.push(<optgroup key="other" label="Other">{cats.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}</optgroup>);
+                        } else {
+                          const family = activeFamilies.find(f => String(f.id) === String(familyId));
+                          if (family) result.push(<optgroup key={familyId} label={family.name}>{cats.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}</optgroup>);
+                        }
+                      }
+                      return result;
+                    })()}
                   </select>
                 </div>
                 <div>

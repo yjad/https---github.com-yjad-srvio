@@ -4,25 +4,28 @@ import { mockApi } from '@/api/mockApi';
 import { useQuery } from '@tanstack/react-query';
 import { Card, Avatar, StarRating, Skeleton, ServiceImage } from '@/components/shared';
 import { Search, ArrowRight, Star, Shield, Clock, CheckCircle, Users, Briefcase, Sparkles } from 'lucide-react';
+import { cn } from '@/utils/cn';
 import { useState } from 'react';
-
-const categoryColors: Record<number, string> = {
-  1: 'from-blue-500 to-blue-600',
-  2: 'from-green-500 to-green-600',
-  3: 'from-amber-500 to-amber-600',
-  4: 'from-purple-500 to-purple-600',
-  5: 'from-pink-500 to-pink-600',
-  6: 'from-teal-500 to-teal-600',
-};
 
 export default function HomePage() {
   const { isAuthenticated, user, isLoading: authLoading } = useAuthStore();
   const [searchTerm, setSearchTerm] = useState('');
 
+  const [selectedFamily, setSelectedFamily] = useState<number | null>(null);
+
+  const { data: families } = useQuery({
+    queryKey: ['service-families'],
+    queryFn: () => mockApi.getServiceFamilies(),
+  });
+
   const { data: categories, isLoading: catLoading } = useQuery({
     queryKey: ['categories'],
     queryFn: () => mockApi.getCategories(),
   });
+
+  const filteredCategories = selectedFamily
+    ? categories?.filter(c => String(c.familyId) === String(selectedFamily)) || []
+    : categories?.filter(c => families?.some(f => String(f.id) === String(c.familyId))) || [];
 
   const { data: services, isLoading: svcLoading } = useQuery({
     queryKey: ['services', 'home'],
@@ -92,6 +95,27 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Family Tab Bar */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8">
+        <div className="flex flex-wrap gap-2">
+          {families?.map(family => (
+            <button
+              key={family.id}
+              onClick={() => setSelectedFamily(selectedFamily === family.id ? null : family.id)}
+              className={cn(
+                'px-4 py-2 rounded-full text-sm font-medium transition-all',
+                selectedFamily === family.id
+                  ? 'text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              )}
+              style={selectedFamily === family.id ? { backgroundColor: family.color } : undefined}
+            >
+              {family.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Stats */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 -mt-8 relative z-10">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -119,18 +143,25 @@ export default function HomePage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {catLoading
             ? Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)
-            : categories?.map(cat => (
-                <Link key={cat.id} to={`/services?category=${cat.id}`}>
-                  <Card className="p-4 text-center hover:shadow-md transition-all hover:-translate-y-1">
-                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${categoryColors[cat.id] || 'from-gray-400 to-gray-500'} flex items-center justify-center text-2xl mx-auto mb-3`}>
-                      {cat.icon}
-                    </div>
-                    <h3 className="font-semibold text-gray-900 text-sm">{cat.name}</h3>
-                    <p className="text-xs text-gray-500 mt-1">{cat.serviceCount} services</p>
-                  </Card>
-                </Link>
-              ))
+            : filteredCategories?.map(cat => {
+                const fam = families?.find(f => String(f.id) === String(cat.familyId));
+                const gradient = fam ? fam.color : '#6b7280';
+                return (
+                  <Link key={cat.id} to={`/services?category=${cat.id}`}>
+                    <Card className="p-4 text-center hover:shadow-md transition-all hover:-translate-y-1">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mx-auto mb-3" style={{ background: `linear-gradient(135deg, ${gradient}, ${gradient}dd)` }}>
+                        {cat.icon}
+                      </div>
+                      <h3 className="font-semibold text-gray-900 text-sm">{cat.name}</h3>
+                      <p className="text-xs text-gray-500 mt-1">{cat.serviceCount} services</p>
+                    </Card>
+                  </Link>
+                );
+              })
           }
+          {!catLoading && filteredCategories.length === 0 && (
+            <p className="text-gray-400 text-center py-8 col-span-full">No categories in this family yet.</p>
+          )}
         </div>
       </section>
 

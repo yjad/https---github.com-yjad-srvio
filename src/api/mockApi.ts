@@ -1,6 +1,27 @@
-import type { User, Service, Booking, Review, Category, BookingStatus, AdminStats, AuthToken, SystemSettings, PaymentTransaction, TransactionType, ProviderEarnings } from '@/types';
+import type { User, Service, Booking, Review, Category, ServiceFamily, BookingStatus, AdminStats, AuthToken, SystemSettings, PaymentTransaction, TransactionType, ProviderEarnings, ServiceComment, ImageBlob, Dispute, DisputeMessage, DisputeEvidence, DisputeTimelineEntry, DisputeStatus, DisputeCategory, DisputeResolutionType } from '@/types';
 
 const BASE = '/api';
+
+const ID_FIELDS = new Set([
+  'id', 'userId', 'customerId', 'providerId', 'serviceId',
+  'bookingId', 'disputeId', 'actorId', 'uploaderId', 'raisedById',
+  'categoryId', 'familyId',
+]);
+
+function normalizeIds<T>(obj: T): T {
+  if (Array.isArray(obj)) return obj.map(normalizeIds) as unknown as T;
+  if (obj && typeof obj === 'object') {
+    for (const key of Object.keys(obj as Record<string, unknown>)) {
+      const val = (obj as Record<string, unknown>)[key];
+      if (ID_FIELDS.has(key) && typeof val === 'string' && /^\d+$/.test(val)) {
+        (obj as Record<string, unknown>)[key] = Number(val);
+      } else {
+        normalizeIds(val);
+      }
+    }
+  }
+  return obj;
+}
 
 async function api<T>(url: string, options?: RequestInit): Promise<T> {
   const isBody = options?.method && options.method !== 'GET';
@@ -12,7 +33,7 @@ async function api<T>(url: string, options?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok && res.status !== 404) throw new Error(`API error: ${res.status}`);
-  return res.json();
+  return normalizeIds(await res.json()) as T;
 }
 
 // ─── Auth Utilities ───────────────────────────────────────
@@ -42,11 +63,22 @@ function stripPassword(u: User): User {
   return safe as User;
 }
 
+
+
 // ─── Email Verification (simulated) ────────────────────────
 const verificationPins: Record<string, { pin: string; expiresAt: number }> = {};
 
 function generatePin(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// ─── ID Generator (json-server v1 beta generates UUID strings; force numeric IDs) ──
+async function nextId(collection: string): Promise<number> {
+  const items = await api<any[]>(`/${collection}`);
+  return items.reduce((max, item) => {
+    const num = Number(item.id);
+    return Number.isFinite(num) ? Math.max(max, num) : max;
+  }, 0) + 1;
 }
 
 // ─── API Layer ────────────────────────────────────────────
@@ -62,14 +94,16 @@ export const mockApi = {
   async register(input: { name: string; email: string; password: string; phone: string; role: 'CUSTOMER' | 'PROVIDER' | 'CUSTOMER_SERVICE' }): Promise<{ token: string; user: User }> {
     const existing = await api<User[]>(`/users?email=${encodeURIComponent(input.email)}`);
     if (existing.length > 0) throw new Error('Email already registered');
+    const id = await nextId('users');
     const newUser = await api<User>('/users', {
       method: 'POST',
       body: JSON.stringify({
+        id,
         ...input,
         avatar: '',
         bio: '',
         joinDate: new Date().toISOString().split('T')[0],
-        isVerified: false,
+        isVerified: input.role === 'PROVIDER' ? false : true,
         preferredLanguage: 'en',
       }),
     });
@@ -126,6 +160,24 @@ export const mockApi = {
     }));
   },
 
+  async adminCreateUser(input: { name: string; email: string; password: string; phone: string; role: 'CUSTOMER' | 'PROVIDER' | 'CUSTOMER_SERVICE' | 'ADMIN'; preferredLanguage: string }): Promise<User> {
+    const existing = await api<User[]>(`/users?email=${encodeURIComponent(input.email)}`);
+    if (existing.length > 0) throw new Error('Email already registered');
+    const id = await nextId('users');
+    const newUser = await api<User>('/users', {
+      method: 'POST',
+      body: JSON.stringify({
+        id,
+        ...input,
+        avatar: '',
+        bio: '',
+        joinDate: new Date().toISOString().split('T')[0],
+        isVerified: true,
+      }),
+    });
+    return stripPassword(newUser);
+  },
+
   async updatePassword(userId: number, oldPass: string, newPass: string): Promise<void> {
     const user = await api<User>(`/users/${userId}`);
     if (user.password !== oldPass) throw new Error('Current password incorrect');
@@ -146,9 +198,11 @@ export const mockApi = {
   },
 
   async createCategory(data: Partial<Category>): Promise<Category> {
+    const id = await nextId('categories');
     return api<Category>('/categories', {
       method: 'POST',
       body: JSON.stringify({
+        id,
         name: data.name || 'Untitled',
         icon: data.icon || '',
         description: data.description || '',
@@ -156,6 +210,7 @@ export const mockApi = {
         serviceCount: 0,
         isActive: data.isActive !== undefined ? data.isActive : true,
         activationDate: data.activationDate || new Date().toISOString().split('T')[0],
+        familyId: data.familyId,
       }),
     });
   },
@@ -174,10 +229,57 @@ export const mockApi = {
     return updated;
   },
 
+  // ── Service Families ──
+  async getServiceFamilies(): Promise<ServiceFamily[]> {
+    const families = await api<ServiceFamily[]>('/serviceFamilies');
+    return families.filter(f => f.isActive !== false).sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+
+  async getAllServiceFamilies(): Promise<ServiceFamily[]> {
+    return api<ServiceFamily[]>('/serviceFamilies');
+  },
+
+  async getServiceFamilyById(id: number): Promise<ServiceFamily | null> {
+    try { return await api<ServiceFamily>(`/serviceFamilies/${id}`); } catch { return null; }
+  },
+
+  async createServiceFamily(data: Partial<ServiceFamily>): Promise<ServiceFamily> {
+    const id = await nextId('serviceFamilies');
+    return api<ServiceFamily>('/serviceFamilies', {
+      method: 'POST',
+      body: JSON.stringify({
+        id,
+        name: data.name || 'Untitled',
+        description: data.description || '',
+        icon: data.icon || 'Folder',
+        color: data.color || '#6b7280',
+        isActive: data.isActive !== undefined ? data.isActive : true,
+        sortOrder: data.sortOrder ?? 0,
+        createdAt: new Date().toISOString().split('T')[0],
+      }),
+    });
+  },
+
+  async updateServiceFamily(id: number, data: Partial<ServiceFamily>): Promise<ServiceFamily> {
+    return api<ServiceFamily>(`/serviceFamilies/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
+
+  async deleteServiceFamily(id: number): Promise<void> {
+    await fetch(`${BASE}/serviceFamilies/${id}`, { method: 'DELETE' });
+    const categories = await api<Category[]>(`/categories?familyId=${id}`);
+    for (const c of categories) {
+      await api(`/categories/${c.id}`, { method: 'PATCH', body: JSON.stringify({ familyId: undefined }) }).catch(() => {});
+    }
+  },
+
+  async getCategoriesByFamily(familyId: number): Promise<Category[]> {
+    const all = await api<Category[]>('/categories');
+    return all.filter(c => String(c.familyId) === String(familyId));
+  },
+
   // ── Services ──
-  async getServices(params?: { category?: number | null; search?: string; priceMin?: number | null; priceMax?: number | null; sortBy?: string; providerId?: number | null }): Promise<Service[]> {
+  async getServices(params?: { category?: number | null; familyId?: number | null; search?: string; priceMin?: number | null; priceMax?: number | null; sortBy?: string; providerId?: number | null }): Promise<Service[]> {
     const q = new URLSearchParams();
-    if (params?.category) q.set('categoryId', String(params.category));
     if (params?.search) q.set('q', params.search);
     if (params?.priceMin != null) q.set('price_gte', String(params.priceMin));
     if (params?.priceMax != null) q.set('price_lte', String(params.priceMax));
@@ -187,8 +289,21 @@ export const mockApi = {
     else if (params?.sortBy === 'price_desc') { q.set('_sort', '-price'); }
     else if (params?.sortBy === 'name') { q.set('_sort', 'name'); }
 
-    const services = await api<Service[]>(`/services?${q.toString()}`);
-    return services.filter(s => s.isActive !== false);
+    let services = await api<Service[]>(`/services?${q.toString()}`);
+
+    // Client-side category/family filtering
+    if (params?.category) {
+      services = services.filter(s => String(s.categoryId) === String(params.category));
+    } else if (params?.familyId) {
+      const allCategories = await api<Category[]>('/categories');
+      const ids = allCategories.filter(c => String(c.familyId) === String(params.familyId)).map(c => String(c.id));
+      services = services.filter(s => ids.includes(String(s.categoryId)));
+    }
+
+    if (params?.providerId) {
+      return services.filter(s => s.isActive !== false);
+    }
+    return services.filter(s => s.isActive !== false && s.verificationStatus === 'approved');
   },
 
   async getServiceById(id: number): Promise<Service | null> {
@@ -196,9 +311,10 @@ export const mockApi = {
   },
 
   async createService(data: Omit<Service, 'id' | 'rating' | 'reviewCount' | 'createdAt'>): Promise<Service> {
+    const id = await nextId('services');
     return api<Service>('/services', {
       method: 'POST',
-      body: JSON.stringify({ ...data, rating: 0, reviewCount: 0, createdAt: new Date().toISOString().split('T')[0] }),
+      body: JSON.stringify({ id, ...data, rating: 0, reviewCount: 0, verificationStatus: 'pending', isActive: false, createdAt: new Date().toISOString().split('T')[0] }),
     });
   },
 
@@ -231,11 +347,13 @@ export const mockApi = {
     ]);
     const platformCommission = Math.round(service.price * (settings.platformCommissionPercentage / 100));
     const platformTax = Math.round(platformCommission * (settings.commissionTaxPercentage / 100));
+    const id = await nextId('bookings');
     return api<Booking>('/bookings', {
       method: 'POST',
       body: JSON.stringify({
+        id,
         ...data,
-        customerId: data.customerId,
+        customerId: Number(data.customerId),
         customerName: customer.name,
         customerEmail: customer.email,
         serviceName: service.name,
@@ -286,9 +404,11 @@ export const mockApi = {
     booking.remainingAmount -= amountInDollars;
     if (type === 'RESERVATION') { booking.paymentStatus = 'PARTIALLY_PAID'; booking.status = 'ACCEPTED' as BookingStatus; }
     else if (type === 'FINAL_PAYMENT') { booking.paymentStatus = 'FULLY_PAID'; }
+    const txId = await nextId('transactions');
     await api<PaymentTransaction>('/transactions', {
       method: 'POST',
       body: JSON.stringify({
+        id: txId,
         bookingId,
         stripePaymentIntentId: `pi_${Math.random().toString(36).substring(7)}`,
         type, amount: amountInCents, currency: 'CAD', status: 'succeeded',
@@ -310,6 +430,50 @@ export const mockApi = {
     return api<PaymentTransaction[]>(`/transactions${bookingId ? `?bookingId=${bookingId}` : ''}`);
   },
 
+  // ── Service Approval Cycle ──
+  async getPendingServices(): Promise<Service[]> {
+    const all = await api<Service[]>('/services');
+    return all.filter(s => s.verificationStatus === 'pending');
+  },
+
+  async getServiceComments(serviceId: number): Promise<ServiceComment[]> {
+    const all = await api<ServiceComment[]>('/serviceComments');
+    return all.filter(c => c.serviceId === serviceId).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  },
+
+  async getAllServiceComments(): Promise<ServiceComment[]> {
+    return api<ServiceComment[]>('/serviceComments');
+  },
+
+  async addServiceComment(data: { serviceId: number; fromId: number; fromName: string; fromRole: UserRole; message: string; attachments?: string[] }): Promise<ServiceComment> {
+    const id = await nextId('serviceComments');
+    return api<ServiceComment>('/serviceComments', {
+      method: 'POST',
+      body: JSON.stringify({ id, ...data, createdAt: new Date().toISOString() }),
+    });
+  },
+
+  async updateServiceComment(id: number, data: { message: string; attachments?: string[] }): Promise<ServiceComment> {
+    return api<ServiceComment>(`/serviceComments/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ...data, edited: true, editedAt: new Date().toISOString() }),
+    });
+  },
+
+  async deleteServiceComment(id: number): Promise<void> {
+    await fetch(`${BASE}/serviceComments/${id}`, { method: 'DELETE' });
+  },
+
+  sendRejectionEmail(providerEmail: string, serviceName: string, note: string): void {
+    console.log('%c📧 REJECTION EMAIL', 'background:#dc2626;color:white;padding:4px 8px;font-weight:bold;border-radius:4px 4px 0 0;');
+    console.log(`  To:      ${providerEmail}`);
+    console.log(`  Subject: Service "${serviceName}" has been rejected`);
+    console.log(`  Body:    Your service "${serviceName}" was not approved.\n`);
+    console.log(`           Reason: ${note}\n`);
+    console.log(`           Please review the feedback and resubmit.`);
+    console.log('%c──────────────────────────────────────', 'color:#dc2626');
+  },
+
   // ── Reviews ──
   async getReviews(providerId?: number, serviceId?: number): Promise<Review[]> {
     const q = new URLSearchParams();
@@ -320,9 +484,11 @@ export const mockApi = {
 
   async createReview(data: { bookingId: number; rating: number; comment: string }): Promise<Review> {
     const booking = await api<Booking>(`/bookings/${data.bookingId}`);
+    const id = await nextId('reviews');
     const newReview = await api<Review>('/reviews', {
       method: 'POST',
       body: JSON.stringify({
+        id,
         ...data,
         customerId: booking.customerId,
         customerName: booking.customerName,
@@ -363,6 +529,14 @@ export const mockApi = {
     const allRatings = reviews.map(r => r.rating);
     const avgRating = allRatings.length > 0 ? Math.round((allRatings.reduce((a, b) => a + b, 0) / allRatings.length) * 10) / 10 : 0;
     return { totalUsers: regularUsers.length, totalProviders: providers.length, totalServices: services.length, totalBookings: bookings.length, totalRevenue, pendingBookings: bookings.filter(b => b.status === 'REQUESTED').length, activeBookings: bookings.filter(b => ['ACCEPTED', 'IN_PROGRESS'].includes(b.status)).length, completedBookings: completedBookings.length, cancelledBookings: bookings.filter(b => b.status === 'CANCELLED').length, avgRating, monthlyBookings, revenueByCategory, statusDistribution };
+  },
+
+  async getUserById(id: number): Promise<User | null> {
+    try {
+      return stripPassword(await api<User>(`/users/${id}`));
+    } catch {
+      return null;
+    }
   },
 
   async getAllUsers(): Promise<User[]> {
@@ -429,14 +603,240 @@ export const mockApi = {
     return { totalSpent, totalBookings: bookings.length, pendingBookings: pending.length, completedBookings: completed.length, monthlySpending };
   },
 
+  // ── Disputes ──
+  async getDisputes(filters?: { userId?: number; role?: string }): Promise<Dispute[]> {
+    const all = await api<Dispute[]>('/disputes');
+    if (!filters) return all;
+    if (filters.role === 'CUSTOMER_SERVICE' || filters.role === 'ADMIN') return all;
+    if (filters.role === 'PROVIDER' && filters.userId) {
+      const bookings = await api<Booking[]>('/bookings');
+      const providerBookingIds = bookings.filter(b => b.providerId === filters.userId).map(b => b.id);
+      return all.filter(d => d.raisedById === filters.userId || providerBookingIds.includes(d.bookingId));
+    }
+    return all.filter(d => d.raisedById === filters.userId);
+  },
+
+  async getDisputeById(id: number): Promise<Dispute | null> {
+    try {
+      return await api<Dispute>(`/disputes/${id}`);
+    } catch {
+      return null;
+    }
+  },
+
+  async createDispute(data: { bookingId: number; raisedById: number; raisedByRole: 'CUSTOMER' | 'PROVIDER'; disputeCategory: DisputeCategory; title: string; description: string; requestedResolution: DisputeResolutionType }): Promise<Dispute> {
+    const [bookings, settings] = await Promise.all([
+      api<Booking[]>('/bookings'),
+      api<SystemSettings>('/systemSettings'),
+    ]);
+    const booking = bookings.find(b => b.id === data.bookingId);
+    if (!booking) throw new Error('Booking not found');
+    if (booking.status !== 'COMPLETED') throw new Error('Booking must be completed to raise a dispute');
+    const existing = await api<Dispute[]>('/disputes');
+    if (existing.some(d => d.bookingId === data.bookingId && d.status !== 'CLOSED')) {
+      throw new Error('A dispute already exists for this booking');
+    }
+    const daysSinceCompletion = (Date.now() - new Date(booking.createdAt).getTime()) / 86400000;
+    if (daysSinceCompletion > settings.disputeWindowDays) throw new Error('Dispute window has expired');
+
+    const id = await nextId('disputes');
+    const now = new Date().toISOString();
+    const dispute = await api<Dispute>('/disputes', {
+      method: 'POST',
+      body: JSON.stringify({ id, ...data, status: 'OPEN', holdAmount: booking.totalPrice - (booking.paidAmount || 0), createdAt: now, updatedAt: now }),
+    });
+    await api<Booking>(`/bookings/${data.bookingId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ paymentStatus: 'DISPUTED' }),
+    });
+    await this.addTimelineEntry({ disputeId: id, action: 'CREATED', actorId: data.raisedById, actorRole: data.raisedByRole, description: 'Dispute opened' });
+    return dispute;
+  },
+
+  async updateDisputeStatus(id: number, status: DisputeStatus): Promise<Dispute> {
+    const dispute = await this.getDisputeById(id);
+    if (!dispute) throw new Error('Dispute not found');
+    const transitionMap: Record<string, DisputeStatus[]> = {
+      OPEN: ['CLOSED', 'UNDER_REVIEW'],
+      UNDER_REVIEW: ['MEDIATION', 'REJECTED', 'CLOSED'],
+      MEDIATION: ['ESCALATED', 'RESOLVED'],
+      ESCALATED: ['RESOLVED'],
+      RESOLVED: ['CLOSED', 'REFUNDED'],
+      REJECTED: ['CLOSED'],
+      REFUNDED: ['CLOSED'],
+    };
+    const allowed = transitionMap[dispute.status] || [];
+    if (!allowed.includes(status)) throw new Error(`Cannot transition from ${dispute.status} to ${status}`);
+    const updated = await api<Dispute>(`/disputes/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, updatedAt: new Date().toISOString(), ...(status === 'CLOSED' ? { closedAt: new Date().toISOString() } : {}) }),
+    });
+    return updated;
+  },
+
+  async resolveDispute(id: number, resolution: { type: string; csComment: string; actorId: number; financialSummary: string }): Promise<Dispute> {
+    const dispute = await this.getDisputeById(id);
+    if (!dispute) throw new Error('Dispute not found');
+    if (dispute.status !== 'UNDER_REVIEW' && dispute.status !== 'MEDIATION' && dispute.status !== 'ESCALATED') {
+      throw new Error('Dispute must be under review, mediation, or escalated to resolve');
+    }
+    const now = new Date().toISOString();
+    const updated = await api<Dispute>(`/disputes/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status: 'RESOLVED',
+        resolution: { ...resolution, timestamp: now },
+        updatedAt: now,
+      }),
+    });
+    await this.addTimelineEntry({ disputeId: id, action: 'RESOLVED', actorId: resolution.actorId, actorRole: 'ADMIN', description: `Resolved: ${resolution.type}` });
+    return updated;
+  },
+
+  async getDisputeMessages(disputeId: number): Promise<DisputeMessage[]> {
+    const all = await api<DisputeMessage[]>('/disputeMessages');
+    return all.filter(m => m.disputeId === disputeId).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  },
+
+  async addDisputeMessage(disputeId: number, data: { fromId: number; fromRole: UserRole; message: string; isInternalNote?: boolean }): Promise<DisputeMessage> {
+    const dispute = await this.getDisputeById(disputeId);
+    if (!dispute) throw new Error('Dispute not found');
+    if (data.isInternalNote && data.fromRole !== 'CUSTOMER_SERVICE' && data.fromRole !== 'ADMIN') {
+      throw new Error('Only CS staff can add internal notes');
+    }
+    const id = await nextId('disputeMessages');
+    const msg = await api<DisputeMessage>('/disputeMessages', {
+      method: 'POST',
+      body: JSON.stringify({ id, disputeId, ...data, isInternalNote: data.isInternalNote || false, createdAt: new Date().toISOString() }),
+    });
+    return msg;
+  },
+
+  async getDisputeEvidence(disputeId: number): Promise<DisputeEvidence[]> {
+    const all = await api<DisputeEvidence[]>('/disputeEvidence');
+    return all.filter(e => e.disputeId === disputeId);
+  },
+
+  async deleteDisputeEvidence(id: number, filePath: string): Promise<void> {
+    await Promise.all([
+      this.deleteImage(filePath),
+      fetch(`${BASE}/disputeEvidence/${id}`, { method: 'DELETE' }),
+    ]);
+  },
+
+  async uploadEvidence(disputeId: number, data: { uploaderId: number; fileType: string; fileName: string; filePath: string }): Promise<DisputeEvidence> {
+    const dispute = await this.getDisputeById(disputeId);
+    if (!dispute) throw new Error('Dispute not found');
+    if (!['OPEN', 'UNDER_REVIEW', 'MEDIATION', 'ESCALATED'].includes(dispute.status)) {
+      throw new Error('Cannot upload evidence to a closed or resolved dispute');
+    }
+    const id = await nextId('disputeEvidence');
+    const checksum = btoa(`${data.fileName}:${data.uploaderId}:${Date.now()}`);
+    return api<DisputeEvidence>('/disputeEvidence', {
+      method: 'POST',
+      body: JSON.stringify({ id, disputeId, ...data, checksum, uploadedAt: new Date().toISOString() }),
+    });
+  },
+
+  async getDisputeTimeline(disputeId: number): Promise<DisputeTimelineEntry[]> {
+    const all = await api<DisputeTimelineEntry[]>('/disputeTimeline');
+    return all.filter(t => t.disputeId === disputeId).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  },
+
+  async addTimelineEntry(data: { disputeId: number; action: string; actorId: number; actorRole: UserRole; description: string }): Promise<DisputeTimelineEntry> {
+    const id = await nextId('disputeTimeline');
+    return api<DisputeTimelineEntry>('/disputeTimeline', {
+      method: 'POST',
+      body: JSON.stringify({ id, ...data, createdAt: new Date().toISOString() }),
+    });
+  },
+
+  async getAllDisputes(): Promise<Dispute[]> {
+    return api<Dispute[]>('/disputes');
+  },
+
+  async getCSDisputeStats(): Promise<{ open: number; underReview: number; escalated: number; resolved: number }> {
+    const all = await api<Dispute[]>('/disputes');
+    return {
+      open: all.filter(d => d.status === 'OPEN').length,
+      underReview: all.filter(d => d.status === 'UNDER_REVIEW').length,
+      escalated: all.filter(d => d.status === 'ESCALATED').length,
+      resolved: all.filter(d => d.status === 'RESOLVED' || d.status === 'REFUNDED').length,
+    };
+  },
+
+  async checkMediationTimeouts(): Promise<void> {
+    const disputes = await api<Dispute[]>('/disputes');
+    const settings = await api<SystemSettings>('/systemSettings');
+    const now = Date.now();
+    for (const d of disputes) {
+      if (d.status === 'MEDIATION') {
+        const elapsed = (now - new Date(d.createdAt).getTime()) / 3600000;
+        if (elapsed >= settings.mediationDurationHours) {
+          await api<Dispute>(`/disputes/${d.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'ESCALATED', updatedAt: new Date().toISOString() }),
+          });
+        }
+      }
+    }
+  },
+
+  // ── Image Upload ──
+  async saveImage(data: string, subfolder: string = 'attachments'): Promise<string> {
+    const ext = data.startsWith('data:image/png') ? 'png' : data.startsWith('data:image/gif') ? 'gif' : 'jpg';
+    const res = await api<{ url: string }>('/upload', {
+      method: 'POST',
+      body: JSON.stringify({ data, subfolder, name: `file.${ext}` }),
+    });
+    return res.url;
+  },
+
+  async getImageBlob(path: string): Promise<string | null> {
+    if (path.startsWith('/uploads/')) return path;
+    // Legacy blob store fallback
+    try {
+      const blobs = await api<ImageBlob[]>('/imageBlobs');
+      return blobs.find(b => b.path === path)?.data || null;
+    } catch {
+      return null;
+    }
+  },
+
+  async deleteImage(path: string): Promise<void> {
+    if (path.startsWith('/uploads/')) {
+      await fetch(`${BASE}/upload`, {
+        method: 'DELETE',
+        body: JSON.stringify({ url: path }),
+      });
+      return;
+    }
+    // Legacy blob store fallback
+    try {
+      const blobs = await api<ImageBlob[]>('/imageBlobs');
+      const blob = blobs.find(b => b.path === path);
+      if (blob) {
+        await fetch(`${BASE}/imageBlobs/${blob.id}`, { method: 'DELETE' });
+      }
+    } catch {
+      /* ignore */
+    }
+  },
+
+  async getAllImageBlobs(): Promise<ImageBlob[]> {
+    return api<ImageBlob[]>('/imageBlobs');
+  },
+
   // ── Reset ──
   async resetDatabase(): Promise<void> {
-    const collections = ['categories', 'users', 'services', 'bookings', 'reviews', 'transactions', 'payouts', 'disputes'];
+    const collections = ['categories', 'users', 'services', 'bookings', 'reviews', 'transactions', 'payouts', 'disputes', 'disputeMessages', 'disputeEvidence', 'disputeTimeline', 'serviceComments', 'serviceFamilies', 'imageBlobs'];
     for (const col of collections) {
       const items = await api<any[]>(`/${col}`);
       for (const item of items) {
         await fetch(`${BASE}/${col}/${item.id}`, { method: 'DELETE' }).catch(() => { });
       }
     }
+    // Clear uploaded files
+    await fetch(`${BASE}/upload`, { method: 'DELETE', body: JSON.stringify({ url: '__all__' }) }).catch(() => { });
   },
 };
