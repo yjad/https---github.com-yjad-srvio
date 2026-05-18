@@ -18,6 +18,10 @@ const DB_PATH = path.resolve(__dirname, 'db.json');
 const UPLOADS_DIR = process.env.SRVIO_UPLOADS_DIR || path.resolve(__dirname, 'uploads');
 if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
 
+// json-server v1 requires a `public` dir to exist even when static: []
+const PUBLIC_DIR = path.resolve(__dirname, 'public');
+if (!existsSync(PUBLIC_DIR)) mkdirSync(PUBLIC_DIR, { recursive: true });
+
 // Run seed
 try {
   execSync('node seed.js', { cwd: __dirname, stdio: 'inherit', shell: true });
