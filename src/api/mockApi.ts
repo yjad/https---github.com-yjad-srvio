@@ -1,6 +1,8 @@
 import type { User, Service, Booking, Review, Category, ServiceFamily, BookingStatus, AdminStats, AuthToken, SystemSettings, PaymentTransaction, TransactionType, ProviderEarnings, ServiceComment, ImageBlob, Dispute, DisputeMessage, DisputeEvidence, DisputeTimelineEntry, DisputeStatus, DisputeCategory, DisputeResolutionType } from '@/types';
 
-const BASE = '/api';
+const BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api';
 
 const ID_FIELDS = new Set([
   'id', 'userId', 'customerId', 'providerId', 'serviceId',
