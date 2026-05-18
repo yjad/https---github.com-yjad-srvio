@@ -1,7 +1,8 @@
 import type { User, Service, Booking, Review, Category, ServiceFamily, BookingStatus, AdminStats, AuthToken, SystemSettings, PaymentTransaction, TransactionType, ProviderEarnings, ServiceComment, ImageBlob, Dispute, DisputeMessage, DisputeEvidence, DisputeTimelineEntry, DisputeStatus, DisputeCategory, DisputeResolutionType } from '@/types';
 
 const BASE = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api`
+  // ? `${import.meta.env.VITE_API_URL}/api`
+  ? `${import.meta.env.VITE_API_URL}`
   : '/api';
 
 const ID_FIELDS = new Set([
@@ -270,7 +271,7 @@ export const mockApi = {
     await fetch(`${BASE}/serviceFamilies/${id}`, { method: 'DELETE' });
     const categories = await api<Category[]>(`/categories?familyId=${id}`);
     for (const c of categories) {
-      await api(`/categories/${c.id}`, { method: 'PATCH', body: JSON.stringify({ familyId: undefined }) }).catch(() => {});
+      await api(`/categories/${c.id}`, { method: 'PATCH', body: JSON.stringify({ familyId: undefined }) }).catch(() => { });
     }
   },
 
