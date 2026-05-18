@@ -167,12 +167,11 @@ const server = createServer(async (req, res) => {
   jsonApp.attach(req, res);
 });
 
-// server.listen(3000, () => {
-//   console.log(`\n  Srvio API running on port 3000\n  Press CTRL-C to stop\n`);
-// });
+const PORT = Number(process.env.PORT) || 3000;
+const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
 
-const port = process.env.PORT || 3000;
-server.listen(port, '0.0.0.0', () => {
-  console.log(`Server running on port ${port}`);
+server.listen(PORT, HOST, () => {
+  console.log(`\n  Srvio API running on ${HOST}:${PORT}\n  Press CTRL-C to stop\n`);
 });
+
 
