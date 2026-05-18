@@ -21,7 +21,7 @@ if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
 // Run seed
 try {
   execSync('node seed.js', { cwd: __dirname, stdio: 'inherit', shell: true });
-} catch {}
+} catch { }
 
 // Handle empty file
 if (existsSync(DB_PATH) && readFileSync(DB_PATH, 'utf-8').trim() === '') {
@@ -167,6 +167,12 @@ const server = createServer(async (req, res) => {
   jsonApp.attach(req, res);
 });
 
-server.listen(3000, () => {
-  console.log(`\n  Srvio API running on port 3000\n  Press CTRL-C to stop\n`);
+// server.listen(3000, () => {
+//   console.log(`\n  Srvio API running on port 3000\n  Press CTRL-C to stop\n`);
+// });
+
+const port = process.env.PORT || 3000;
+server.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on port ${port}`);
 });
+
