@@ -5,6 +5,7 @@ import { Button, Input } from '@/components/shared';
 import { loginSchema, registerSchema } from '@/schemas';
 import { mockApi } from '@/api/mockApi';
 import { Eye, EyeOff, Mail, Lock, User, Phone, Sparkles, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 type RegisterForm = { name: string; email: string; password: string; phone: string; role: 'CUSTOMER' | 'PROVIDER' };
 
@@ -46,7 +47,7 @@ export function LoginPage() {
         <div className="relative max-w-md">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-2xl">⚡</div>
-            <span className="text-2xl font-bold">srvio</span>
+            <span className="text-2xl font-bold"><span className="text-primary-600 text-[1.3em] leading-none">خ</span>دمات</span>
           </div>
           <h2 className="text-4xl font-bold mb-4">Welcome Back!</h2>
           <p className="text-primary-200 text-lg mb-8">Sign in to access your bookings, manage services, and connect with providers.</p>
@@ -65,7 +66,7 @@ export function LoginPage() {
         <div className="w-full max-w-md">
           <div className="lg:hidden flex items-center gap-2 mb-8">
             <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center"><span className="text-white text-lg">⚡</span></div>
-            <span className="text-xl font-bold">Srvio</span>
+            <span className="text-xl font-bold"><span className="text-primary-600 text-[1.3em] leading-none">خ</span>دمات</span>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Sign In</h1>
           <p className="text-gray-500 mb-8">Enter your credentials to access your account</p>
@@ -75,11 +76,11 @@ export function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="relative">
               <Mail className="absolute left-3 top-9 w-5 h-5 text-gray-400" />
-              <Input label="Email Address" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} error={fieldErrors.email} className="pl-10" />
+              <Input label="Email Address" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} error={fieldErrors.email} className="pl-10" required />
             </div>
             <div className="relative">
               <Lock className="absolute left-3 top-9 w-5 h-5 text-gray-400" />
-              <Input label="Password" type={showPassword ? 'text' : 'password'} placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} error={fieldErrors.password} className="pl-10 pr-10" />
+              <Input label="Password" type={showPassword ? 'text' : 'password'} placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} error={fieldErrors.password} className="pl-10 pr-10" required />
               <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-9 text-gray-400 hover:text-gray-600">
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
@@ -108,6 +109,7 @@ export function LoginPage() {
 export function RegisterPage() {
   const { register, isLoading, error, clearError } = useAuthStore();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState<RegisterForm>({ name: '', email: '', password: '', phone: '', role: 'CUSTOMER' });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -199,7 +201,7 @@ export function RegisterPage() {
         <div className="relative max-w-md">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-2xl">⚡</div>
-            <span className="text-2xl font-bold">srvio</span>
+            <span className="text-2xl font-bold"><span className="text-primary-600 text-[1.3em] leading-none">خ</span>دمات</span>
           </div>
           <h2 className="text-4xl font-bold mb-4">Join Our Community</h2>
           <p className="text-accent-100 text-lg mb-8">Create an account to book services or offer your expertise to thousands of customers.</p>
@@ -210,10 +212,10 @@ export function RegisterPage() {
         <div className="w-full max-w-md">
           <div className="lg:hidden flex items-center gap-2 mb-8">
             <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center"><span className="text-white text-lg">⚡</span></div>
-            <span className="text-xl font-bold">Srvio</span>
+            <span className="text-xl font-bold"><span className="text-primary-600 text-[1.3em] leading-none">خ</span>دمات</span>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
-          <p className="text-gray-500 mb-8">Join srvio to book or offer services</p>
+          <p className="text-gray-500 mb-8">{t('auth.register_subtitle')}</p>
 
           {step === 'form' && error && <div className="mb-6 p-4 bg-danger-50 border border-danger-200 rounded-xl text-danger-700 text-sm">{error}</div>}
 
@@ -283,19 +285,19 @@ export function RegisterPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="relative">
                   <User className="absolute left-3 top-9 w-5 h-5 text-gray-400 z-10" />
-                  <Input label="Full Name" placeholder="John Doe" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} error={fieldErrors.name} className="pl-10" />
+                  <Input label="Full Name" placeholder="John Doe" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} error={fieldErrors.name} className="pl-10" required />
                 </div>
                 <div className="relative">
                   <Mail className="absolute left-3 top-9 w-5 h-5 text-gray-400 z-10" />
-                  <Input label="Email Address" type="email" placeholder="you@example.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} error={fieldErrors.email} className="pl-10" />
+                  <Input label="Email Address" type="email" placeholder="you@example.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} error={fieldErrors.email} className="pl-10" required />
                 </div>
                 <div className="relative">
                   <Phone className="absolute left-3 top-9 w-5 h-5 text-gray-400 z-10" />
-                  <Input label="Phone Number" placeholder="555-000-0000" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} error={fieldErrors.phone} className="pl-10" />
+                  <Input label="Phone Number" placeholder="555-000-0000" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} error={fieldErrors.phone} className="pl-10" required />
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-9 w-5 h-5 text-gray-400 z-10" />
-                  <Input label="Password" type={showPassword ? 'text' : 'password'} placeholder="Min 6 characters" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} error={fieldErrors.password} className="pl-10 pr-10" />
+                  <Input label="Password" type={showPassword ? 'text' : 'password'} placeholder="Min 6 characters" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} error={fieldErrors.password} className="pl-10 pr-10" required />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-9 text-gray-400 hover:text-gray-600">
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>

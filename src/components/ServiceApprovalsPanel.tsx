@@ -6,6 +6,7 @@ import { CheckCircle, XCircle, MessageCircle, ChevronDown, ChevronUp } from 'luc
 import { useState } from 'react';
 import ServiceCommentThread from '@/components/ServiceCommentThread';
 import type { Service, User } from '@/types';
+import { serviceProviderName } from '@/utils/localize';
 
 interface ServiceApprovalsPanelProps {
   currentUserId: number;
@@ -114,9 +115,9 @@ export default function ServiceApprovalsPanel({ currentUserId, currentUserRole, 
                   <h3 className="font-semibold text-gray-900">{service.name}</h3>
                   <Badge>pending</Badge>
                 </div>
-                <p className="text-sm text-gray-500 mt-1">{service.providerName}</p>
+                <p className="text-sm text-gray-500 mt-1">{serviceProviderName(service)}</p>
                 <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
-                  <span>${service.price} / {service.priceUnit}</span>
+                  <span>{service.price} / {service.priceUnit}</span>
                   <span>{service.duration}</span>
                   <span>{new Date(service.createdAt).toLocaleDateString()}</span>
                 </div>

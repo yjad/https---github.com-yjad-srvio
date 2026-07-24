@@ -7,32 +7,35 @@ import { useUIStore } from '@/store/uiStore';
 import { Card, Badge, Button, PageHeader, Skeleton, EmptyState, Modal, Select, Input, Textarea, DisputeStatusBadge } from '@/components/shared';
 import { disputeCreateSchema } from '@/schemas';
 import { ShieldAlert, Plus, Calendar, FileText, AlertTriangle, Upload, X } from 'lucide-react';
-
-const DISPUTE_CATEGORIES = [
-  { value: 'SERVICE_NOT_DELIVERED', label: 'Service Not Delivered' },
-  { value: 'POOR_QUALITY', label: 'Poor Quality' },
-  { value: 'WRONG_PRICE', label: 'Wrong Price' },
-  { value: 'DAMAGED_PROPERTY', label: 'Damaged Property' },
-  { value: 'PROVIDER_NO_SHOW', label: 'Provider No Show' },
-  { value: 'CUSTOMER_ABUSE', label: 'Customer Abuse' },
-  { value: 'INCOMPLETE_WORK', label: 'Incomplete Work' },
-  { value: 'PAYMENT_ISSUE', label: 'Payment Issue' },
-  { value: 'OTHER', label: 'Other' },
-];
-
-const RESOLUTION_OPTIONS = [
-  { value: 'FULL_REFUND', label: 'Full Refund' },
-  { value: 'PARTIAL_REFUND', label: 'Partial Refund' },
-  { value: 'REWORK', label: 'Rework' },
-  { value: 'PAYMENT_RELEASE', label: 'Payment Release' },
-  { value: 'ACCOUNT_REVIEW', label: 'Account Review' },
-  { value: 'OTHER', label: 'Other' },
-];
+import { useTranslation } from 'react-i18next';
 
 export default function DisputesPage() {
   const { user } = useAuthStore();
   const { addNotification } = useUIStore();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
+
+  const DISPUTE_CATEGORIES = [
+    { value: 'SERVICE_NOT_DELIVERED', label: t('disputes.categories.SERVICE_NOT_DELIVERED') },
+    { value: 'POOR_QUALITY', label: t('disputes.categories.POOR_QUALITY') },
+    { value: 'WRONG_PRICE', label: t('disputes.categories.WRONG_PRICE') },
+    { value: 'DAMAGED_PROPERTY', label: t('disputes.categories.DAMAGED_PROPERTY') },
+    { value: 'PROVIDER_NO_SHOW', label: t('disputes.categories.PROVIDER_NO_SHOW') },
+    { value: 'CUSTOMER_ABUSE', label: t('disputes.categories.CUSTOMER_ABUSE') },
+    { value: 'INCOMPLETE_WORK', label: t('disputes.categories.INCOMPLETE_WORK') },
+    { value: 'PAYMENT_ISSUE', label: t('disputes.categories.PAYMENT_ISSUE') },
+    { value: 'OTHER', label: t('disputes.categories.OTHER') },
+  ];
+
+  const RESOLUTION_OPTIONS = [
+    { value: 'FULL_REFUND', label: t('disputes.resolutions.FULL_REFUND') },
+    { value: 'PARTIAL_REFUND', label: t('disputes.resolutions.PARTIAL_REFUND') },
+    { value: 'REWORK', label: t('disputes.resolutions.REWORK') },
+    { value: 'PAYMENT_RELEASE', label: t('disputes.resolutions.PAYMENT_RELEASE') },
+    { value: 'ACCOUNT_REVIEW', label: t('disputes.resolutions.ACCOUNT_REVIEW') },
+    { value: 'OTHER', label: t('disputes.resolutions.OTHER') },
+  ];
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<'list' | 'create'>(searchParams.has('create') ? 'create' : 'list');
   const [createModal, setCreateModal] = useState(searchParams.has('create'));
@@ -96,7 +99,7 @@ export default function DisputesPage() {
       return dispute;
     },
     onSuccess: () => {
-      addNotification('Dispute created successfully', 'success');
+      addNotification(t('disputes.created_success'), 'success');
       setCreateModal(false);
       setCreateFiles([]);
       setCreateFilePreviews([]);
@@ -136,7 +139,7 @@ export default function DisputesPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-      <PageHeader title="Disputes" subtitle="Raise and track service disputes" />
+      <PageHeader title={t('disputes.title')} subtitle={t('disputes.subtitle')} />
 
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
         {(['list', 'create'] as const).map(tab => (
@@ -145,7 +148,7 @@ export default function DisputesPage() {
             onClick={() => { setActiveTab(tab); setErrors({}); }}
             className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors whitespace-nowrap ${activeTab === tab ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
           >
-            {tab === 'list' ? 'My Disputes' : 'Create Dispute'}
+            {tab === 'list' ? t('disputes.my_disputes') : t('disputes.create_dispute')}
           </button>
         ))}
       </div>
@@ -155,9 +158,9 @@ export default function DisputesPage() {
           {!disputes || disputes.length === 0 ? (
             <EmptyState
               icon={<ShieldAlert className="w-8 h-8" />}
-              title="No disputes"
-              description={user?.role === 'PROVIDER' ? "No disputes involving your services." : "You haven't raised any disputes yet. If you have an issue with a completed booking, you can create a dispute."}
-              action={user?.role !== 'PROVIDER' ? <Button variant="primary" onClick={() => setActiveTab('create')}><Plus className="w-4 h-4 mr-1" /> Raise a Dispute</Button> : undefined}
+              title={t('disputes.no_disputes')}
+              description={user?.role === 'PROVIDER' ? t('disputes.no_disputes_desc_provider') : t('disputes.no_disputes_desc_customer')}
+              action={user?.role !== 'PROVIDER' ? <Button variant="primary" onClick={() => setActiveTab('create')}><Plus className="w-4 h-4 mr-1" /> {t('disputes.raise_dispute')}</Button> : undefined}
             />
           ) : (
             <div className="space-y-4">
@@ -173,12 +176,12 @@ export default function DisputesPage() {
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
                           <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />{new Date(dispute.createdAt).toLocaleDateString()}</span>
                           <span className="flex items-center gap-1"><FileText className="w-4 h-4" />Booking #{dispute.bookingId}</span>
-                          <span><AlertTriangle className="w-4 h-4 inline mr-1" />{dispute.disputeCategory.replace(/_/g, ' ')}</span>
+                          <span><AlertTriangle className="w-4 h-4 inline mr-1" />{t(`disputes.categories.${dispute.disputeCategory}` as any) || dispute.disputeCategory.replace(/_/g, ' ')}</span>
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-sm font-medium text-gray-900">${dispute.holdAmount}</p>
-                        <p className="text-xs text-gray-500">on hold</p>
+                        <p className="text-sm font-medium text-gray-900">{dispute.holdAmount}</p>
+                        <p className="text-xs text-gray-500">{t('disputes.on_hold')}</p>
                       </div>
                     </div>
                   </Card>
@@ -193,43 +196,48 @@ export default function DisputesPage() {
         <Card className="p-6">
           <form onSubmit={handleCreate} className="space-y-4">
             <Select
-              label="Booking"
+              label={t('disputes.booking_label')}
               error={errors.bookingId}
-              options={(completedBookings || []).map(b => ({ value: b.id, label: `#${b.id} - ${b.serviceName} (${b.date})` }))}
+              options={(completedBookings || []).map(b => ({ value: b.id, label: `#${b.id} — ${b.serviceName} (${b.date})` }))}
               value={form.bookingId}
               onChange={e => setForm({ ...form, bookingId: Number(e.target.value) })}
+              required
             />
             <Select
-              label="Category"
+              label={t('disputes.category_label')}
               error={errors.disputeCategory}
               options={DISPUTE_CATEGORIES}
               value={form.disputeCategory}
               onChange={e => setForm({ ...form, disputeCategory: e.target.value })}
+              required
             />
             <Input
-              label="Title"
+              label={t('disputes.title_label')}
               error={errors.title}
               value={form.title}
               onChange={e => setForm({ ...form, title: e.target.value })}
-              placeholder="Brief title for your dispute"
+              placeholder={t('disputes.title_placeholder')}
+              required
             />
             <Textarea
-              label="Description"
+              label={t('disputes.description_label')}
               error={errors.description}
               value={form.description}
               onChange={e => setForm({ ...form, description: e.target.value })}
-              placeholder="Describe the issue in detail"
+              placeholder={t('disputes.description_placeholder')}
               rows={4}
+              required
             />
             <Select
-              label="Requested Resolution"
+              label={t('disputes.resolution_label')}
               error={errors.requestedResolution}
               options={RESOLUTION_OPTIONS}
               value={form.requestedResolution}
               onChange={e => setForm({ ...form, requestedResolution: e.target.value })}
+              required
             />
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Evidence Photos (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('disputes.evidence_photos')}</label>
               <div className="flex items-center gap-3">
                 <input
                   ref={createFileInputRef}
@@ -249,7 +257,7 @@ export default function DisputesPage() {
                   }}
                 />
                 <Button variant="outline" type="button" onClick={() => createFileInputRef.current?.click()}>
-                  <Upload className="w-4 h-4 mr-1" /> Select Photos
+                  <Upload className="w-4 h-4 mr-1" /> {t('disputes.select_photos')}
                 </Button>
               </div>
               {createFilePreviews.length > 0 && (
@@ -273,7 +281,7 @@ export default function DisputesPage() {
               )}
             </div>
             <Button type="submit" variant="primary" size="lg" className="w-full" loading={createMutation.isPending}>
-              Submit Dispute
+              {t('disputes.submit_dispute')}
             </Button>
           </form>
         </Card>

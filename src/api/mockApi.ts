@@ -1,4 +1,4 @@
-import type { User, Service, Booking, Review, Category, ServiceFamily, BookingStatus, AdminStats, AuthToken, SystemSettings, PaymentTransaction, TransactionType, ProviderEarnings, ServiceComment, ImageBlob, Dispute, DisputeMessage, DisputeEvidence, DisputeTimelineEntry, DisputeStatus, DisputeCategory, DisputeResolutionType } from '@/types';
+import type { User, Service, Booking, Review, Category, ServiceFamily, BookingStatus, AdminStats, AuthToken, SystemSettings, PaymentTransaction, TransactionType, ProviderEarnings, ServiceComment, ImageBlob, Dispute, DisputeMessage, DisputeEvidence, DisputeTimelineEntry, DisputeStatus, DisputeCategory, DisputeResolutionType, BookingMessage } from '@/types';
 
 const BASE = import.meta.env.VITE_API_URL
   // ? `${import.meta.env.VITE_API_URL}/api`
@@ -149,18 +149,34 @@ export const mockApi = {
 
   async updateUser(userId: number, data: Partial<User>): Promise<User> {
     const { id, email, role, password, ...updatable } = data;
-    return stripPassword(await api<User>(`/users/${userId}`, {
+    const updated = stripPassword(await api<User>(`/users/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(updatable),
     }));
+    if (updatable.name) {
+      api<Service[]>(`/services?providerId=${userId}`).then(services => {
+        for (const svc of services) {
+          api(`/services/${svc.id}`, { method: 'PATCH', body: JSON.stringify({ providerName: updatable.name, ...(updatable.nameAr !== undefined && { providerNameAr: updatable.nameAr }) }) });
+        }
+      }).catch(() => {});
+    }
+    return updated;
   },
 
   async adminUpdateUser(userId: number, data: Partial<User>): Promise<User> {
     const { id, password, ...updatable } = data;
-    return stripPassword(await api<User>(`/users/${userId}`, {
+    const updated = stripPassword(await api<User>(`/users/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(updatable),
     }));
+    if (updatable.name) {
+      api<Service[]>(`/services?providerId=${userId}`).then(services => {
+        for (const svc of services) {
+          api(`/services/${svc.id}`, { method: 'PATCH', body: JSON.stringify({ providerName: updatable.name, ...(updatable.nameAr !== undefined && { providerNameAr: updatable.nameAr }) }) });
+        }
+      }).catch(() => {});
+    }
+    return updated;
   },
 
   async adminCreateUser(input: { name: string; email: string; password: string; phone: string; role: 'CUSTOMER' | 'PROVIDER' | 'CUSTOMER_SERVICE' | 'ADMIN'; preferredLanguage: string }): Promise<User> {
@@ -378,6 +394,106 @@ export const mockApi = {
 
   async updateBookingStatus(id: number, status: BookingStatus): Promise<Booking> {
     return api<Booking>(`/bookings/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  },
+
+  async counterOfferBooking(id: number, data: { proposedDate: string; proposedTime: string; offerNote?: string }): Promise<Booking> {
+    const booking = await api<Booking>(`/bookings/${id}`);
+    if (booking.status !== 'REQUESTED' && booking.status !== 'COUNTER_OFFERED') {
+      throw new Error('Booking cannot be counter-offered in its current status');
+    }
+    const round = (booking.offerRound || 0) + 1;
+    const updated = await api<Booking>(`/bookings/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status: 'COUNTER_OFFERED',
+        proposedDate: data.proposedDate,
+        proposedTime: data.proposedTime,
+        offerNote: data.offerNote || '',
+        offerRound: round,
+      }),
+    });
+    await mockApi.sendBookingMessage(id, {
+      fromId: 0,
+      fromName: 'System',
+      fromRole: 'ADMIN',
+      type: 'system',
+      message: `Counter-offer sent (round ${round}/3): ${data.proposedDate} at ${data.proposedTime}${data.offerNote ? ` — ${data.offerNote}` : ''}`,
+    });
+    if (round >= 3) {
+      await api<Booking>(`/bookings/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'CANCELLED' }) });
+      await mockApi.sendBookingMessage(id, {
+        fromId: 0,
+        fromName: 'System',
+        fromRole: 'ADMIN',
+        type: 'system',
+        message: 'Maximum negotiation rounds reached. Booking has been automatically cancelled.',
+      });
+    }
+    return updated;
+  },
+
+  async acceptBooking(id: number): Promise<Booking> {
+    const booking = await api<Booking>(`/bookings/${id}`);
+    if (booking.status !== 'REQUESTED' && booking.status !== 'COUNTER_OFFERED') {
+      throw new Error('Booking cannot be accepted in its current status');
+    }
+    const patch: Partial<Booking> = { status: 'ACCEPTED' };
+    if (booking.status === 'COUNTER_OFFERED' && booking.proposedDate && booking.proposedTime) {
+      patch.date = booking.proposedDate;
+      patch.time = booking.proposedTime;
+    }
+    const updated = await api<Booking>(`/bookings/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    });
+    await mockApi.sendBookingMessage(id, {
+      fromId: 0,
+      fromName: 'System',
+      fromRole: 'ADMIN',
+      type: 'system',
+      message: `Booking accepted! Scheduled for ${updated.date} at ${updated.time}.`,
+    });
+    return updated;
+  },
+
+  async cancelBooking(id: number, reason?: string): Promise<Booking> {
+    const updated = await api<Booking>(`/bookings/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'CANCELLED' }),
+    });
+    await mockApi.sendBookingMessage(id, {
+      fromId: 0,
+      fromName: 'System',
+      fromRole: 'ADMIN',
+      type: 'system',
+      message: `Booking cancelled${reason ? `: ${reason}` : ''}.`,
+    });
+    return updated;
+  },
+
+  async getBookingMessages(bookingId: number): Promise<BookingMessage[]> {
+    const all = await api<BookingMessage[]>('/bookingMessages');
+    return all
+      .filter(m => m.bookingId === bookingId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  },
+
+  async sendBookingMessage(bookingId: number, data: { fromId: number; fromName: string; fromRole: import('@/types').UserRole; message: string; type?: 'message' | 'system' }): Promise<BookingMessage> {
+    const id = await nextId('bookingMessages');
+    const msg: BookingMessage = {
+      id,
+      bookingId,
+      fromId: data.fromId,
+      fromName: data.fromName,
+      fromRole: data.fromRole,
+      type: data.type || 'message',
+      message: data.message,
+      createdAt: new Date().toISOString(),
+    };
+    return api<BookingMessage>('/bookingMessages', {
+      method: 'POST',
+      body: JSON.stringify(msg),
+    });
   },
 
   // ── Payments & Transactions ──
@@ -830,9 +946,15 @@ export const mockApi = {
     return api<ImageBlob[]>('/imageBlobs');
   },
 
+  async uploadAvatar(userId: number, base64: string): Promise<{ url: string }> {
+    const url = await mockApi.saveImage(base64, 'avatars');
+    await mockApi.updateUser(userId, { avatar: url });
+    return { url };
+  },
+
   // ── Reset ──
   async resetDatabase(): Promise<void> {
-    const collections = ['categories', 'users', 'services', 'bookings', 'reviews', 'transactions', 'payouts', 'disputes', 'disputeMessages', 'disputeEvidence', 'disputeTimeline', 'serviceComments', 'serviceFamilies', 'imageBlobs'];
+    const collections = ['categories', 'users', 'services', 'bookings', 'reviews', 'transactions', 'payouts', 'disputes', 'disputeMessages', 'disputeEvidence', 'disputeTimeline', 'serviceComments', 'serviceFamilies', 'imageBlobs', 'bookingMessages'];
     for (const col of collections) {
       const items = await api<any[]>(`/${col}`);
       for (const item of items) {

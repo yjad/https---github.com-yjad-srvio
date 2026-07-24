@@ -4,7 +4,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuthStore } from '@/store/authStore';
-import { useTranslation } from 'react-i18next';
 
 // Pages
 import HomePage from '@/pages/HomePage';
@@ -22,6 +21,7 @@ import CSDisputesPage from '@/pages/CSDisputesPage';
 import ProfilePage from '@/pages/ProfilePage';
 import AdminSettingsPage from '@/pages/AdminSettingsPage';
 import BrowseDBPage from '@/pages/BrowseDBPage';
+import ProviderProfilePage from '@/pages/ProviderProfilePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,18 +35,10 @@ const queryClient = new QueryClient({
 
 export default function App() {
   const init = useAuthStore(state => state.init);
-  const user = useAuthStore(state => state.user);
-  const { i18n } = useTranslation();
 
   useEffect(() => {
     init();
   }, [init]);
-
-  useEffect(() => {
-    if (user?.preferredLanguage && i18n.language !== user.preferredLanguage) {
-      i18n.changeLanguage(user.preferredLanguage);
-    }
-  }, [user?.preferredLanguage, i18n]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -60,6 +52,7 @@ export default function App() {
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/services" element={<ServiceListPage />} />
               <Route path="/services/:id" element={<ServiceDetailPage />} />
+              <Route path="/providers/:id" element={<ProviderProfilePage />} />
               
               <Route path="/profile" element={
                 <ProtectedRoute>

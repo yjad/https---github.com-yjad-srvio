@@ -82,7 +82,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess, amount, title, descri
       <div className="space-y-6">
         <div className="text-center">
           <p className="text-gray-600 mb-2">{description}</p>
-          <p className="text-3xl font-bold text-gray-900">${(amount / 100).toFixed(2)}</p>
+          <p className="text-3xl font-bold text-gray-900">{(amount / 100).toFixed(2)}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

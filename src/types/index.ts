@@ -1,5 +1,5 @@
 export type UserRole = 'CUSTOMER' | 'PROVIDER' | 'ADMIN' | 'CUSTOMER_SERVICE';
-export type BookingStatus = 'REQUESTED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type BookingStatus = 'REQUESTED' | 'ACCEPTED' | 'COUNTER_OFFERED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type PaymentStatus = 'UNPAID' | 'PARTIALLY_PAID' | 'PAYMENT_PENDING' | 'FULLY_PAID' | 'REFUNDED' | 'FAILED' | 'DISPUTED';
 export type PayoutStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'FAILED';
 export type TransactionType = 'RESERVATION' | 'FINAL_PAYMENT' | 'REFUND' | 'PENALTY';
@@ -8,12 +8,15 @@ export type DisputeStatus = 'OPEN' | 'UNDER_REVIEW' | 'MEDIATION' | 'ESCALATED' 
 export interface User {
   id: number;
   name: string;
+  nameAr: string;
   email: string;
   password: string;
   role: UserRole;
   phone: string;
   avatar: string;
   bio: string;
+  bioAr?: string;
+  address: string;
   joinDate: string;
   isVerified: boolean;
   preferredLanguage: string;
@@ -22,7 +25,9 @@ export interface User {
 export interface ServiceFamily {
   id: number;
   name: string;
+  nameAr?: string;
   description: string;
+  descriptionAr?: string;
   icon: string;
   color: string;
   isActive: boolean;
@@ -33,8 +38,10 @@ export interface ServiceFamily {
 export interface Category {
   id: number;
   name: string;
+  nameAr?: string;
   icon: string;
   description: string;
+  descriptionAr?: string;
   color: string;
   serviceCount: number;
   isActive?: boolean;
@@ -45,10 +52,13 @@ export interface Category {
 export interface Service {
   id: number;
   name: string;
+  nameAr?: string;
   description: string;
+  descriptionAr?: string;
   categoryId: number;
   providerId: number;
   providerName: string;
+  providerNameAr?: string;
   providerAvatar: string;
   providerRating: number;
   price: number;
@@ -83,9 +93,24 @@ export interface Booking {
   paidAmount: number;
   remainingAmount: number;
   notes: string;
+  proposedDate?: string;
+  proposedTime?: string;
+  offerNote?: string;
+  offerRound?: number;
   createdAt: string;
   platformCommission?: number;
   platformTax?: number;
+}
+
+export interface BookingMessage {
+  id: number;
+  bookingId: number;
+  fromId: number;
+  fromName: string;
+  fromRole: UserRole;
+  type: 'message' | 'system';
+  message: string;
+  createdAt: string;
 }
 
 export interface PaymentTransaction {

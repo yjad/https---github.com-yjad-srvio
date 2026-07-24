@@ -5,35 +5,51 @@ import { mockApi } from '@/api/mockApi';
 import { useMutation } from '@tanstack/react-query';
 import { profileSchema, passwordResetSchema } from '@/schemas';
 import { PageHeader, Card, Input, Button, Textarea, Select } from '@/components/shared';
-import { User, Lock, Mail, Phone, Shield, Languages } from 'lucide-react';
+import { User, Lock, Mail, Phone, Shield, Languages, Camera, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { cn } from '@/utils/cn';
+import { localizedName } from '@/utils/localize';
 
 export default function ProfilePage() {
   const { user } = useAuthStore();
   const { addNotification } = useUIStore();
   const { t, i18n } = useTranslation();
-  
+
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
+    nameAr: user?.nameAr || '',
     phone: user?.phone || '',
     bio: user?.bio || '',
+    bioAr: user?.bioAr || '',
+    address: user?.address || '',
     preferredLanguage: user?.preferredLanguage || 'en',
   });
-  
+
+  const isProfileDirty = JSON.stringify(profileData) !== JSON.stringify({
+    name: user?.name || '',
+    nameAr: user?.nameAr || '',
+    phone: user?.phone || '',
+    bio: user?.bio || '',
+    bioAr: user?.bioAr || '',
+    address: user?.address || '',
+    preferredLanguage: user?.preferredLanguage || 'en',
+  });
+
   const [passwordData, setPasswordData] = useState({
     oldPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
-  
+
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const updateProfileMutation = useMutation({
     mutationFn: (data: any) => mockApi.updateUser(user!.id, data),
     onSuccess: (updatedUser) => {
       addNotification(t('common.save_success', 'Profile updated successfully'), 'success');
       useAuthStore.setState({ user: updatedUser });
-      // Apply language change immediately if it was updated
       if (updatedUser.preferredLanguage !== i18n.language) {
         i18n.changeLanguage(updatedUser.preferredLanguage);
       }
@@ -84,7 +100,41 @@ export default function ProfilePage() {
     updatePasswordMutation.mutate(passwordData);
   };
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      addNotification(t('common.invalid_image', 'Please select an image file'), 'error');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      addNotification(t('common.file_too_large', 'File size must be less than 5MB'), 'error');
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      const base64 = await fileToBase64(file);
+      setAvatarPreview(base64);
+
+      const res = await mockApi.uploadAvatar(user!.id, base64);
+      if (res.url) {
+        addNotification(t('common.avatar_updated', 'Avatar updated successfully'), 'success');
+        useAuthStore.setState({ user: { ...user!, avatar: res.url } });
+      }
+    } catch (err: any) {
+      addNotification(err.message || t('common.upload_failed', 'Failed to upload avatar'), 'error');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   if (!user) return null;
+
+  const displayAvatar = avatarPreview || user.avatar || null;
+  const initials = user.name?.charAt(0).toUpperCase() || '?';
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
@@ -97,10 +147,36 @@ export default function ProfilePage() {
         {/* User Info Sidebar */}
         <div className="space-y-6">
           <Card className="p-6 text-center">
-            <div className="w-24 h-24 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl font-bold">
-              {user.name.charAt(0)}
+            <div className="relative w-24 h-24 mx-auto mb-4">
+              {displayAvatar ? (
+                <img 
+                  src={displayAvatar} 
+                  alt={user.name} 
+                  className="w-full h-full rounded-full object-cover border-4 border-white shadow-lg"
+                />
+              ) : (
+                <div className="w-full h-full bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-3xl font-bold border-4 border-white shadow-lg">
+                  {initials}
+                </div>
+              )}
+              <label 
+                htmlFor="avatar-upload"
+                className="absolute bottom-0 right-0 w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-primary-700 transition-colors shadow-lg"
+                title={t('profile.change_avatar', 'Change avatar')}
+              >
+                <Camera className="w-4 h-4" />
+                <input
+                  id="avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="sr-only"
+                  disabled={avatarUploading}
+                />
+                {avatarUploading && <Upload className="w-4 h-4 animate-spin" />}
+              </label>
             </div>
-            <h2 className="text-xl font-bold text-gray-900">{user.name}</h2>
+            <h2 className="text-xl font-bold text-gray-900">{localizedName(user)}</h2>
             <p className="text-sm text-gray-500 mb-4">{user.email}</p>
             <div className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
               user.role === 'ADMIN' ? 'bg-red-100 text-red-700' : 
@@ -108,7 +184,7 @@ export default function ProfilePage() {
               user.role === 'CUSTOMER_SERVICE' ? 'bg-purple-100 text-purple-700' :
               'bg-blue-100 text-blue-700'
             }`}>
-              {user.role}
+              {t(`profile.role.${user.role}` as any) || user.role}
             </div>
           </Card>
 
@@ -123,7 +199,7 @@ export default function ProfilePage() {
             </div>
             <div className="flex items-center gap-3 text-gray-600">
               <Shield className="w-4 h-4" />
-              <span>Joined {user.joinDate}</span>
+              <span>{t('profile.joined')} {new Date(user.joinDate).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
             </div>
           </Card>
         </div>
@@ -137,19 +213,37 @@ export default function ProfilePage() {
               {t('profile.personal_info')}
             </div>
             <form onSubmit={handleProfileSubmit} className="space-y-4">
-              <Input
-                label={t('profile.full_name')}
-                value={profileData.name}
-                onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                error={errors.name}
-                placeholder="Your full name"
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input
+                  label={t('profile.full_name_en')}
+                  value={profileData.name}
+                  onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                  error={errors.name}
+                  placeholder="John Doe"
+                  required
+                />
+                <Input
+                  label={t('profile.full_name_ar')}
+                  value={profileData.nameAr}
+                  onChange={(e) => setProfileData({ ...profileData, nameAr: e.target.value })}
+                  error={errors.nameAr}
+                  placeholder="جون دو"
+                  dir="rtl"
+                />
+              </div>
               <Input
                 label={t('common.phone')}
                 value={profileData.phone}
                 onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
                 error={errors.phone}
                 placeholder="555-000-0000"
+              />
+              <Input
+                label={t('profile.address')}
+                value={profileData.address}
+                onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
+                error={errors.address}
+                placeholder={t('profile.address')}
               />
               <Select
                 label={t('profile.preferred_language')}
@@ -158,22 +252,33 @@ export default function ProfilePage() {
                 error={errors.preferredLanguage}
                 options={[
                   { value: 'en', label: 'English' },
-                  { value: 'fr', label: 'Français' },
+                  { value: 'ar', label: 'العربية' },
                 ]}
+                required
               />
               <Textarea
                 label={t('profile.bio')}
                 value={profileData.bio}
                 onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
                 error={errors.bio}
-                placeholder="Tell us about yourself..."
+                placeholder={t('profile.bio_placeholder')}
                 rows={4}
+              />
+              <Textarea
+                label={t('profile.bio_ar')}
+                value={profileData.bioAr}
+                onChange={(e) => setProfileData({ ...profileData, bioAr: e.target.value })}
+                error={errors.bioAr}
+                placeholder={t('profile.bio_placeholder_ar')}
+                rows={4}
+                dir="rtl"
               />
               <div className="pt-2">
                 <Button 
                   type="submit" 
                   loading={updateProfileMutation.isPending}
                   className="w-full sm:w-auto"
+                  disabled={!isProfileDirty || updateProfileMutation.isPending}
                 >
                   {t('common.save')}
                 </Button>
@@ -195,6 +300,7 @@ export default function ProfilePage() {
                 onChange={(e) => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
                 error={errors.oldPassword}
                 placeholder="••••••••"
+                required
               />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
@@ -204,6 +310,7 @@ export default function ProfilePage() {
                   onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
                   error={errors.newPassword}
                   placeholder="••••••••"
+                  required
                 />
                 <Input
                   type="password"
@@ -212,6 +319,7 @@ export default function ProfilePage() {
                   onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
                   error={errors.confirmPassword}
                   placeholder="••••••••"
+                  required
                 />
               </div>
               <div className="pt-2">
@@ -230,4 +338,13 @@ export default function ProfilePage() {
       </div>
     </div>
   );
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+  });
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isValidEGMobile, egMobileMessage } from '@/utils/validatePhone';
 
 export const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -9,7 +10,7 @@ export const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  phone: z.string().min(10, 'Phone number must be at least 10 digits'),
+  phone: z.string().refine(isValidEGMobile, egMobileMessage),
   role: z.enum(['CUSTOMER', 'PROVIDER', 'CUSTOMER_SERVICE'] as const),
 });
 
@@ -58,8 +59,11 @@ export const categorySchema = z.object({
 
 export const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  phone: z.string(),
+  nameAr: z.string().optional(),
+  phone: z.string().refine(isValidEGMobile, egMobileMessage),
   bio: z.string().optional(),
+  bioAr: z.string().optional(),
+  address: z.string().optional(),
   preferredLanguage: z.string().min(2, 'Language is required'),
 });
 
@@ -76,7 +80,7 @@ export const adminCreateUserSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  phone: z.string().min(10, 'Phone number must be at least 10 digits'),
+  phone: z.string().refine(isValidEGMobile, egMobileMessage),
   role: z.enum(['CUSTOMER', 'PROVIDER', 'CUSTOMER_SERVICE', 'ADMIN'] as const),
   preferredLanguage: z.string().min(2, 'Language is required'),
 });
@@ -112,3 +116,16 @@ export type CategoryInput = z.infer<typeof categorySchema>;
 export type ProfileInput = z.infer<typeof profileSchema>;
 export type DisputeCreateInput = z.infer<typeof disputeCreateSchema>;
 export type DisputeMessageInput = z.infer<typeof disputeMessageSchema>;
+
+export const counterOfferSchema = z.object({
+  proposedDate: z.string().min(1, 'Date is required'),
+  proposedTime: z.string().min(1, 'Time is required'),
+  offerNote: z.string().optional(),
+});
+
+export const bookingMessageSchema = z.object({
+  message: z.string().min(1, 'Message cannot be empty').max(1000, 'Message must be 1000 characters or less'),
+});
+
+export type CounterOfferInput = z.infer<typeof counterOfferSchema>;
+export type BookingMessageInput = z.infer<typeof bookingMessageSchema>;

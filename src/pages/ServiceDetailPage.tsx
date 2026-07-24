@@ -7,6 +7,8 @@ import { useUIStore } from '@/store/uiStore';
 import { Avatar, StarRating, Button, Skeleton, Card, Badge, Modal, ServiceImage } from '@/components/shared';
 import { bookingSchema } from '@/schemas';
 import { Clock, MapPin, Star, ArrowLeft, Shield, MessageSquare } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { localizedName, localizedDescription, serviceProviderName } from '@/utils/localize';
 
 export default function ServiceDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +16,7 @@ export default function ServiceDetailPage() {
   const { isAuthenticated, user } = useAuthStore();
   const { addNotification } = useUIStore();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [bookingModal, setBookingModal] = useState(false);
   const [reviewModal, setReviewModal] = useState(false);
   const [bookingForm, setBookingForm] = useState({ date: '', time: '', address: '', notes: '' });
@@ -102,9 +105,9 @@ export default function ServiceDetailPage() {
   if (!service) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-16 text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Service Not Found</h2>
-        <p className="text-gray-500 mb-4">The service you&apos;re looking for doesn&apos;t exist.</p>
-        <Link to="/services" className="text-primary-600 font-medium">Browse all services →</Link>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('service_detail.not_found')}</h2>
+        <p className="text-gray-500 mb-4">{t('service_detail.not_found_desc')}</p>
+        <Link to="/services" className="text-primary-600 font-medium">{t('service_detail.browse_all')} →</Link>
       </div>
     );
   }
@@ -116,7 +119,7 @@ export default function ServiceDetailPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
       <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-500 hover:text-gray-900 mb-6 text-sm font-medium">
-        <ArrowLeft className="w-4 h-4" /> Back
+        <ArrowLeft className="w-4 h-4" /> {t('service_detail.back')}
       </button>
 
       {/* Breadcrumb */}
@@ -128,12 +131,12 @@ export default function ServiceDetailPage() {
           <nav className="flex items-center gap-2 text-sm text-gray-500 mb-4">
             {fam && fam.isActive ? (
               <>
-                <Link to={`/services?family=${fam.id}`} className="hover:text-primary-600 transition-colors">{fam.name}</Link>
+                <Link to={`/services?family=${fam.id}`} className="hover:text-primary-600 transition-colors">{localizedName(fam)}</Link>
                 <span>/</span>
-                <Link to={`/services?family=${fam.id}&category=${cat.id}`} className="hover:text-primary-600 transition-colors">{cat.name}</Link>
+                <Link to={`/services?family=${fam.id}&category=${cat.id}`} className="hover:text-primary-600 transition-colors">{localizedName(cat)}</Link>
               </>
             ) : (
-              <span>{cat.name}</span>
+              <span>{localizedName(cat)}</span>
             )}
           </nav>
         );
@@ -156,56 +159,57 @@ export default function ServiceDetailPage() {
 
         {/* Info */}
         <div>
-          <Badge className="mb-3">{categories?.find(c => c.id === service.categoryId)?.icon || ''} Service</Badge>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{service.name}</h1>
+          <Badge className="mb-3">{serviceCategory ? localizedName(serviceCategory) : ''} {t('service_detail.service_tag')}</Badge>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{localizedName(service)}</h1>
           <div className="flex items-center gap-3 mb-4">
             <StarRating rating={service.rating} size="md" />
-            <span className="text-sm text-gray-500">({service.reviewCount} reviews)</span>
+            <span className="text-sm text-gray-500">{t('service_detail.reviews_count', { count: service.reviewCount })}</span>
           </div>
-          <p className="text-gray-600 mb-6 leading-relaxed">{service.description}</p>
+          <p className="text-gray-600 mb-6 leading-relaxed">{localizedDescription(service)}</p>
 
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="flex items-center gap-2 text-gray-600">
               <Clock className="w-5 h-5 text-primary-600" />
-              <div><p className="text-xs text-gray-400">Duration</p><p className="font-medium text-sm">{service.duration}</p></div>
+              <div><p className="text-xs text-gray-400">{t('service_detail.duration')}</p><p className="font-medium text-sm">{service.duration}</p></div>
             </div>
             <div className="flex items-center gap-2 text-gray-600">
               <Shield className="w-5 h-5 text-accent-600" />
-              <div><p className="text-xs text-gray-400">Verified</p><p className="font-medium text-sm">Background checked</p></div>
+              <div><p className="text-xs text-gray-400">{t('service_detail.verified')}</p><p className="font-medium text-sm">{t('service_detail.background_checked')}</p></div>
             </div>
           </div>
 
           <div className="bg-gray-50 rounded-xl p-4 mb-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Starting from</p>
-                <p className="text-3xl font-bold text-gray-900">${service.price}</p>
+                <p className="text-sm text-gray-500">{t('service_detail.starting_from')}</p>
+                <p className="text-3xl font-bold text-gray-900">{service.price}</p>
                 <p className="text-sm text-gray-500">{service.priceUnit}</p>
               </div>
               <Button variant="primary" size="lg" onClick={() => {
                 if (!isAuthenticated) { navigate('/login'); return; }
+                setBookingForm({ date: '', time: '', address: user?.address || '', notes: '' });
                 setBookingModal(true);
               }}>
-                Book Now
+                {t('service_detail.book_now')}
               </Button>
             </div>
           </div>
 
           {/* Provider Info */}
           <div className="flex items-center gap-3 p-4 border rounded-xl">
-            <Avatar name={service.providerName} size="lg" />
+             <Avatar name={serviceProviderName(service)} size="lg" />
             <div className="flex-1">
-              <p className="font-semibold text-gray-900">{service.providerName}</p>
-              <p className="text-sm text-gray-500 flex items-center gap-1"><Star className="w-3 h-3 text-amber-500 fill-current" /> {service.providerRating} rating</p>
+              <p className="font-semibold text-gray-900">{serviceProviderName(service)}</p>
+              <p className="text-sm text-gray-500 flex items-center gap-1"><Star className="w-3 h-3 text-amber-500 fill-current" /> {service.providerRating} {t('service_detail.rating')}</p>
             </div>
-            <Link to={`/services?provider=${service.providerId}`} className="text-sm text-primary-600 font-medium">View Profile</Link>
+            <Link to={`/providers/${service.providerId}`} className="text-sm text-primary-600 font-medium">{t('service_detail.view_profile')}</Link>
           </div>
         </div>
       </div>
 
       {/* Reviews Section */}
       <div className="mb-10">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">Reviews ({reviews?.length || 0})</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-6">{t('service_detail.reviews')} ({reviews?.length || 0})</h2>
         {reviews && reviews.length > 0 ? (
           <div className="space-y-4">
             {reviews.map(review => (
@@ -229,7 +233,7 @@ export default function ServiceDetailPage() {
         ) : (
           <div className="text-center py-8 text-gray-500">
             <MessageSquare className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-            <p>No reviews yet. Be the first to review this service!</p>
+            <p>{t('service_detail.no_reviews')}</p>
           </div>
         )}
       </div>
@@ -237,12 +241,12 @@ export default function ServiceDetailPage() {
       {/* Other services by provider */}
       {providerServices && providerServices.length > 1 && (
         <div>
-          <h2 className="text-xl font-bold text-gray-900 mb-4">More from {service.providerName}</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">{t('service_detail.more_from', { name: serviceProviderName(service) })}</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {providerServices.filter(s => s.id !== service.id).slice(0, 3).map(s => (
               <Link key={s.id} to={`/services/${s.id}`}>
                 <Card className="p-4 hover:shadow-md transition-all">
-                  <h4 className="font-medium text-gray-900">{s.name}</h4>
+                  <h4 className="font-medium text-gray-900">{localizedName(s)}</h4>
                   <p className="text-sm text-gray-500 mt-1">{s.duration} · ${s.price} {s.priceUnit}</p>
                   <div className="mt-2"><StarRating rating={s.rating} /></div>
                 </Card>
@@ -253,18 +257,18 @@ export default function ServiceDetailPage() {
       )}
 
       {/* Booking Modal */}
-      <Modal isOpen={bookingModal} onClose={() => setBookingModal(false)} title="Book Service">
+      <Modal isOpen={bookingModal} onClose={() => setBookingModal(false)} title={t('service_detail.book_service')}>
         <form onSubmit={e => {
           e.preventDefault();
           bookingMutation.mutate(bookingForm);
         }} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Service</label>
-            <p className="text-gray-900 font-medium">{service.name}</p>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('services.title')}</label>
+            <p className="text-gray-900 font-medium">{localizedName(service)}</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('service_detail.date')}<span className="text-danger-500 ml-0.5">*</span></label>
               <input type="date" required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 value={bookingForm.date} onChange={e => setBookingForm({ ...bookingForm, date: e.target.value })}
                 min={new Date().toISOString().split('T')[0]}
@@ -272,7 +276,7 @@ export default function ServiceDetailPage() {
               {formErrors.date && <p className="text-xs text-danger-600 mt-1">{formErrors.date}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('service_detail.time')}<span className="text-danger-500 ml-0.5">*</span></label>
               <input type="time" required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 value={bookingForm.time} onChange={e => setBookingForm({ ...bookingForm, time: e.target.value })}
               />
@@ -280,48 +284,48 @@ export default function ServiceDetailPage() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('service_detail.address')}<span className="text-danger-500 ml-0.5">*</span></label>
             <div className="relative">
               <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" required placeholder="Your service address" className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              <input type="text" required placeholder={t('service_detail.address_placeholder')} className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 value={bookingForm.address} onChange={e => setBookingForm({ ...bookingForm, address: e.target.value })}
               />
             </div>
             {formErrors.address && <p className="text-xs text-danger-600 mt-1">{formErrors.address}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-            <textarea rows={3} placeholder="Any special instructions..." className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('service_detail.notes')}</label>
+            <textarea rows={3} placeholder={t('service_detail.notes_placeholder')} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
               value={bookingForm.notes} onChange={e => setBookingForm({ ...bookingForm, notes: e.target.value })}
             />
           </div>
           <div className="bg-gray-50 rounded-lg p-4 space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Service Price</span>
+              <span className="text-gray-500">{t('service_detail.service_price')}</span>
               <span className="font-medium text-gray-900">${service.price}</span>
             </div>
             <div className="flex justify-between text-sm italic">
-              <span className="text-gray-400">Tax</span>
-              <span className="font-medium text-gray-400">Included</span>
+              <span className="text-gray-400">{t('service_detail.tax')}</span>
+              <span className="font-medium text-gray-400">{t('service_detail.tax_included')}</span>
             </div>
             <div className="pt-2 border-t flex justify-between items-baseline">
-              <span className="text-base font-bold text-gray-900">Total</span>
+              <span className="text-base font-bold text-gray-900">{t('service_detail.total')}</span>
               <span className="text-xl font-bold text-primary-600">
                 ${service.price.toFixed(2)}
               </span>
             </div>
             <p className="text-[10px] text-gray-400 mt-2 italic">
-              * A {settings?.reservationPercentage}% reservation fee (${(service.price * (settings?.reservationPercentage || 0) / 100).toFixed(2)}) will be required once the provider accepts your request.
+              {t('service_detail.reservation_fee', { percent: settings?.reservationPercentage || 20, amount: (service.price * (settings?.reservationPercentage || 0) / 100).toFixed(2) })}
             </p>
           </div>
           <Button type="submit" variant="primary" size="lg" className="w-full" loading={bookingMutation.isPending}>
-            Confirm Booking — ${service.price.toFixed(2)}
+            {t('service_detail.confirm_booking', { price: service.price.toFixed(2) })}
           </Button>
         </form>
       </Modal>
 
       {/* Review Modal */}
-      <Modal isOpen={reviewModal} onClose={() => setReviewModal(false)} title="Leave a Review">
+      <Modal isOpen={reviewModal} onClose={() => setReviewModal(false)} title={t('service_detail.leave_review')}>
         <form onSubmit={e => { e.preventDefault(); reviewMutation.mutate(); }} className="space-y-4">
           <div className="flex items-center gap-2">
             {[1, 2, 3, 4, 5].map(i => (
@@ -330,10 +334,10 @@ export default function ServiceDetailPage() {
               </button>
             ))}
           </div>
-          <textarea rows={4} placeholder="Share your experience..." required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+          <textarea rows={4} placeholder={t('service_detail.review_placeholder')} required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
             value={reviewForm.comment} onChange={e => setReviewForm({ ...reviewForm, comment: e.target.value })}
           />
-          <Button type="submit" variant="primary" size="lg" className="w-full" loading={reviewMutation.isPending}>Submit Review</Button>
+          <Button type="submit" variant="primary" size="lg" className="w-full" loading={reviewMutation.isPending}>{t('service_detail.submit_review')}</Button>
         </form>
       </Modal>
     </div>

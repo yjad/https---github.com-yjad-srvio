@@ -6,16 +6,11 @@ import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
 import { Card, Button, PageHeader, Skeleton, Badge, Avatar, Modal, Select, Textarea, DisputeStatusBadge, DisputeTimeline } from '@/components/shared';
 import { ShieldAlert, MessageCircle, Paperclip, Send, Upload, Eye, ArrowLeft, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { localizedName } from '@/utils/localize';
 import type { UserRole } from '@/types';
 
 type TabType = 'overview' | 'messages' | 'evidence' | 'timeline';
-
-const TABS: { key: TabType; label: string; icon: typeof ShieldAlert }[] = [
-  { key: 'overview', label: 'Overview', icon: ShieldAlert },
-  { key: 'messages', label: 'Messages', icon: MessageCircle },
-  { key: 'evidence', label: 'Evidence', icon: Paperclip },
-  { key: 'timeline', label: 'Timeline', icon: Eye },
-];
 
 const CS_ACTIONS = [
   { value: 'REQUEST_MORE_INFO', label: 'Request More Info' },
@@ -32,7 +27,15 @@ export default function DisputeDetailPage() {
   const { user } = useAuthStore();
   const { addNotification } = useUIStore();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const disputeId = Number(id);
+
+  const TABS: { key: TabType; label: string; icon: typeof ShieldAlert }[] = [
+    { key: 'overview', label: t('dispute_detail.overview'), icon: ShieldAlert },
+    { key: 'messages', label: t('dispute_detail.messages'), icon: MessageCircle },
+    { key: 'evidence', label: t('dispute_detail.evidence'), icon: Paperclip },
+    { key: 'timeline', label: t('dispute_detail.timeline'), icon: Eye },
+  ];
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [newMessage, setNewMessage] = useState('');
@@ -118,7 +121,7 @@ export default function DisputeDetailPage() {
     },
     onSuccess: () => {
       setNewMessage('');
-      addNotification('Message sent', 'success');
+      addNotification(t('dispute_detail.message_sent'), 'success');
       queryClient.invalidateQueries({ queryKey: ['dispute-messages', disputeId] });
       queryClient.invalidateQueries({ queryKey: ['dispute-timeline', disputeId] });
     },
@@ -128,7 +131,7 @@ export default function DisputeDetailPage() {
   const statusMutation = useMutation({
     mutationFn: ({ status }: { status: string }) => mockApi.updateDisputeStatus(disputeId, status as any),
     onSuccess: () => {
-      addNotification('Dispute status updated', 'success');
+      addNotification(t('dispute_detail.status_updated'), 'success');
       setCsActionOpen(false);
       setCsAction('');
       setCsComment('');
@@ -144,7 +147,7 @@ export default function DisputeDetailPage() {
       return mockApi.resolveDispute(disputeId, { type, csComment: comment, actorId: user.id, financialSummary: comment });
     },
     onSuccess: () => {
-      addNotification('Dispute resolved', 'success');
+      addNotification(t('dispute_detail.dispute_resolved'), 'success');
       setCsActionOpen(false);
       setCsAction('');
       setCsComment('');
@@ -166,7 +169,7 @@ export default function DisputeDetailPage() {
       return mockApi.uploadEvidence(disputeId, { uploaderId: user.id, fileType: file.type, fileName: file.name, filePath: path });
     },
     onSuccess: () => {
-      addNotification('Evidence uploaded', 'success');
+      addNotification(t('dispute_detail.evidence_uploaded'), 'success');
       setEvidenceFiles(null);
       setEvidencePreviews([]);
       queryClient.invalidateQueries({ queryKey: ['dispute-evidence', disputeId] });
@@ -178,7 +181,7 @@ export default function DisputeDetailPage() {
     mutationFn: ({ id, filePath }: { id: number; filePath: string }) =>
       mockApi.deleteDisputeEvidence(id, filePath),
     onSuccess: () => {
-      addNotification('Evidence removed', 'success');
+      addNotification(t('dispute_detail.evidence_removed'), 'success');
       queryClient.invalidateQueries({ queryKey: ['dispute-evidence', disputeId] });
     },
     onError: (err: Error) => addNotification(err.message, 'error'),
@@ -226,25 +229,25 @@ export default function DisputeDetailPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
       <Link to="/disputes" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-        <ArrowLeft className="w-4 h-4" /> Back to Disputes
+        <ArrowLeft className="w-4 h-4" /> {t('dispute_detail.back')}
       </Link>
 
       <PageHeader
         title={dispute.title}
-        subtitle={<><DisputeStatusBadge status={dispute.status} /> Booking #{dispute.bookingId} — ${dispute.holdAmount} on hold</>}
+        subtitle={<><DisputeStatusBadge status={dispute.status} /> {t('dispute_detail.booking_on_hold', { id: dispute.bookingId, amount: dispute.holdAmount })}</>}
       />
 
       {/* CS Action Bar */}
       {isCS && (
         <Card className="p-4 mb-6 border-l-4 border-primary-500">
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm font-medium text-gray-700">CS Actions:</span>
+            <span className="text-sm font-medium text-gray-700">{t('dispute_detail.cs_actions')}:</span>
             <select
               value={csAction}
               onChange={e => setCsAction(e.target.value)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white"
             >
-              <option value="">Select action...</option>
+              <option value="">{t('dispute_detail.select_action')}</option>
               {CS_ACTIONS.map(a => (
                 <option key={a.value} value={a.value}>{a.label}</option>
               ))}
@@ -255,7 +258,7 @@ export default function DisputeDetailPage() {
               onClick={() => setCsActionOpen(true)}
               disabled={!csAction}
             >
-              Execute
+              {t('dispute_detail.execute')}
             </Button>
           </div>
         </Card>
@@ -281,40 +284,40 @@ export default function DisputeDetailPage() {
       {activeTab === 'overview' && (
         <div className="space-y-6">
           <Card className="p-6">
-            <h3 className="font-semibold text-gray-900 mb-2">Description</h3>
+            <h3 className="font-semibold text-gray-900 mb-2">{t('dispute_detail.description')}</h3>
             <p className="text-sm text-gray-600 whitespace-pre-wrap">{dispute.description}</p>
           </Card>
           <div className="grid sm:grid-cols-2 gap-4">
             <Card className="p-4">
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Category</p>
+              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">{t('dispute_detail.category')}</p>
               <p className="text-sm font-medium text-gray-900">{dispute.disputeCategory.replace(/_/g, ' ')}</p>
             </Card>
             <Card className="p-4">
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Requested Resolution</p>
+              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">{t('dispute_detail.requested_resolution')}</p>
               <p className="text-sm font-medium text-gray-900">{dispute.requestedResolution.replace(/_/g, ' ')}</p>
             </Card>
             <Card className="p-4">
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Raised By</p>
+              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">{t('dispute_detail.raised_by')}</p>
               <div className="flex items-center gap-2">
-                <Avatar name={raiserUser?.name || `${dispute.raisedByRole}`} size="sm" />
+                <Avatar name={localizedName(raiserUser || { name: dispute.raisedByRole })} size="sm" />
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{raiserUser?.name || `${dispute.raisedByRole} #${dispute.raisedById}`}</p>
+                  <p className="text-sm font-medium text-gray-900">{localizedName(raiserUser || { name: dispute.raisedByRole }) || `${dispute.raisedByRole} #${dispute.raisedById}`}</p>
                   <p className="text-xs text-gray-500">{dispute.raisedByRole}</p>
                 </div>
               </div>
             </Card>
             <Card className="p-4">
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Created</p>
+              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">{t('dispute_detail.created')}</p>
               <p className="text-sm font-medium text-gray-900">{new Date(dispute.createdAt).toLocaleString()}</p>
             </Card>
           </div>
           {dispute.resolution && (
             <Card className="p-4 border-l-4 border-accent-500">
-              <h3 className="font-semibold text-gray-900 mb-2">Resolution</h3>
+              <h3 className="font-semibold text-gray-900 mb-2">{t('dispute_detail.resolution')}</h3>
               <div className="space-y-1 text-sm">
-                <p><span className="text-gray-500">Type:</span> <span className="font-medium">{dispute.resolution.type.replace(/_/g, ' ')}</span></p>
-                <p><span className="text-gray-500">Comment:</span> {dispute.resolution.csComment}</p>
-                <p><span className="text-gray-500">Resolved at:</span> {new Date(dispute.resolution.timestamp).toLocaleString()}</p>
+                <p><span className="text-gray-500">{t('dispute_detail.resolution_type')}:</span> <span className="font-medium">{dispute.resolution.type.replace(/_/g, ' ')}</span></p>
+                <p><span className="text-gray-500">{t('dispute_detail.resolution_comment')}:</span> {dispute.resolution.csComment}</p>
+                <p><span className="text-gray-500">{t('dispute_detail.resolved_at')}:</span> {new Date(dispute.resolution.timestamp).toLocaleString()}</p>
               </div>
             </Card>
           )}
@@ -326,7 +329,7 @@ export default function DisputeDetailPage() {
         <Card className="p-0 overflow-hidden">
           <div className="p-4 max-h-96 overflow-y-auto space-y-4">
             {visibleMessages.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-8">No messages yet</p>
+              <p className="text-sm text-gray-500 text-center py-8">{t('dispute_detail.no_messages')}</p>
             ) : (
               visibleMessages.map(msg => {
                 const senderName = senders?.[msg.fromId] || `${msg.fromRole} #${msg.fromId}`;
@@ -342,7 +345,7 @@ export default function DisputeDetailPage() {
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs text-gray-400">{new Date(msg.createdAt).toLocaleString()}</span>
-                        {msg.isInternalNote && <Badge className="text-[10px] px-1.5 py-0">Internal</Badge>}
+                        {msg.isInternalNote && <Badge className="text-[10px] px-1.5 py-0">{t('dispute_detail.internal')}</Badge>}
                       </div>
                     </div>
                   </div>
@@ -356,7 +359,7 @@ export default function DisputeDetailPage() {
                 type="text"
                 value={newMessage}
                 onChange={e => setNewMessage(e.target.value)}
-                placeholder="Type your message..."
+                placeholder={t('dispute_detail.type_message')}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); messageMutation.mutate(); } }}
               />
@@ -373,7 +376,7 @@ export default function DisputeDetailPage() {
         <div className="space-y-6">
           {(isCS || isRaiser) && (
             <Card className="p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Upload Evidence</h3>
+              <h3 className="font-semibold text-gray-900 mb-4">{t('dispute_detail.upload_evidence')}</h3>
               <div className="flex items-center gap-3">
                 <input
                   ref={fileInputRef}
@@ -384,7 +387,7 @@ export default function DisputeDetailPage() {
                   onChange={e => setEvidenceFiles(e.target.files)}
                 />
                 <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-                  <Upload className="w-4 h-4 mr-1" /> Select Files
+                  <Upload className="w-4 h-4 mr-1" /> {t('dispute_detail.select_files')}
                 </Button>
                 {evidenceFiles && evidenceFiles.length > 0 && (
                   <Button variant="primary" onClick={handleEvidenceUpload} loading={evidenceMutation.isPending}>
@@ -398,9 +401,9 @@ export default function DisputeDetailPage() {
             </Card>
           )}
           <Card className="p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Uploaded Evidence ({evidence?.length || 0})</h3>
+            <h3 className="font-semibold text-gray-900 mb-4">{t('dispute_detail.uploaded_evidence', { count: evidence?.length || 0 })}</h3>
             {!evidence || evidence.length === 0 ? (
-              <p className="text-sm text-gray-500">No evidence uploaded yet</p>
+              <p className="text-sm text-gray-500">{t('dispute_detail.no_evidence')}</p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {evidence.map(ev => (
@@ -441,7 +444,7 @@ export default function DisputeDetailPage() {
       {activeTab === 'timeline' && (
         <Card className="p-6">
           {!timeline || timeline.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-8">No timeline entries yet</p>
+            <p className="text-sm text-gray-500 text-center py-8">{t('dispute_detail.no_timeline')}</p>
           ) : (
             <DisputeTimeline entries={timeline} />
           )}
@@ -449,27 +452,27 @@ export default function DisputeDetailPage() {
       )}
 
       {/* CS Action Confirmation Modal */}
-      <Modal isOpen={csActionOpen} onClose={() => setCsActionOpen(false)} title="CS Action">
+      <Modal isOpen={csActionOpen} onClose={() => setCsActionOpen(false)} title={t('dispute_detail.cs_action_title')}>
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Execute <strong>{CS_ACTIONS.find(a => a.value === csAction)?.label}</strong> on this dispute?
+            {t('dispute_detail.cs_action_confirm', { action: CS_ACTIONS.find(a => a.value === csAction)?.label })}
           </p>
           <Textarea
-            label="Comment (required)"
+            label={t('dispute_detail.comment_required')}
             value={csComment}
             onChange={e => setCsComment(e.target.value)}
-            placeholder="Add a note explaining this action..."
+            placeholder={t('dispute_detail.comment_placeholder')}
             rows={3}
           />
           <div className="flex gap-2 justify-end">
-            <Button variant="ghost" onClick={() => setCsActionOpen(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setCsActionOpen(false)}>{t('dispute_detail.cancel')}</Button>
             <Button
               variant="primary"
               onClick={handleCsAction}
               loading={statusMutation.isPending || resolveMutation.isPending}
               disabled={!csComment.trim()}
             >
-              Confirm
+              {t('dispute_detail.confirm')}
             </Button>
           </div>
         </div>

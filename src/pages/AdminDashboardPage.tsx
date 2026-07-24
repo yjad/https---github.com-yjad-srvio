@@ -114,6 +114,7 @@ export default function AdminDashboardPage() {
       return mockApi.createService({
         ...serviceForm,
         providerName: users?.find(u => u.id === serviceForm.providerId)?.name || '',
+        providerNameAr: users?.find(u => u.id === serviceForm.providerId)?.nameAr || '',
         providerAvatar: '',
         providerRating: 0,
       });
@@ -190,7 +191,7 @@ export default function AdminDashboardPage() {
     { label: 'Total Customers', value: stats?.totalUsers || 0, icon: Users, color: 'bg-blue-100 text-blue-600' },
     { label: 'Providers', value: stats?.totalProviders || 0, icon: Shield, color: 'bg-green-100 text-green-600' },
     { label: 'Total Bookings', value: stats?.totalBookings || 0, icon: Briefcase, color: 'bg-purple-100 text-purple-600' },
-    { label: 'Revenue', value: `$${stats?.totalRevenue || 0}`, icon: DollarSign, color: 'bg-amber-100 text-amber-600' },
+    { label: 'Revenue', value: `${stats?.totalRevenue || 0}`, icon: DollarSign, color: 'bg-amber-100 text-amber-600' },
   ];
 
   return (
@@ -313,7 +314,7 @@ export default function AdminDashboardPage() {
               { header: 'Name', accessor: 'name', sortable: true },
               { header: 'Provider', accessor: 'providerName', sortable: true },
               { header: 'Category', accessor: (s: Service) => { const cat = categories?.find(c => String(c.id) === String(s.categoryId)); return cat ? cat.name : s.categoryId; }, sortable: true, sortKey: 'categoryId' },
-              { header: 'Price', accessor: (s: Service) => `$${s.price}`, sortable: true, sortKey: 'price' },
+              { header: 'Price', accessor: (s: Service) => `${s.price}`, sortable: true, sortKey: 'price' },
               { header: 'Verification', accessor: (s: Service) => {
                 const v = s.verificationStatus;
                 if (!v) return <span className="text-gray-400">&mdash;</span>;
@@ -362,7 +363,7 @@ export default function AdminDashboardPage() {
               { header: 'Service', accessor: 'serviceName', sortable: true },
               { header: 'Date', accessor: 'date', sortable: true, className: 'text-gray-500' },
               { header: 'Status', accessor: (b: Booking) => <Badge>{b.status}</Badge>, sortable: true, sortKey: 'status' },
-              { header: 'Amount', accessor: (b: Booking) => `$${b.totalPrice}`, sortable: true, sortKey: 'totalPrice', className: 'font-medium' },
+              { header: 'Amount', accessor: (b: Booking) => `${b.totalPrice}`, sortable: true, sortKey: 'totalPrice', className: 'font-medium' },
             ]}
           />
         </div>
@@ -506,8 +507,8 @@ export default function AdminDashboardPage() {
                 ) 
               },
               { header: 'Type', accessor: (t: any) => <Badge>{t.type}</Badge> },
-              { header: 'Amount', accessor: (t: any) => `$${(t.amount / 100).toFixed(2)}`, className: 'font-medium' },
-              { header: 'Commission Tax', accessor: (t: any) => `$${allBookings?.find(b => b.id === t.bookingId)?.platformTax || 0}`, className: 'text-gray-500 text-sm' },
+              { header: 'Amount', accessor: (t: any) => `${(t.amount / 100).toFixed(2)}`, className: 'font-medium' },
+              { header: 'Commission Tax', accessor: (t: any) => `${allBookings?.find(b => b.id === t.bookingId)?.platformTax || 0}`, className: 'text-gray-500 text-sm' },
               { header: 'Stripe ID', accessor: 'stripePaymentIntentId', className: 'font-mono text-xs text-gray-400' },
               { header: 'Date', accessor: (t: any) => t.createdAt.split('T')[0] },
               { header: 'Status', accessor: (t: any) => <Badge variant="success">{t.status}</Badge> },
@@ -585,19 +586,19 @@ export default function AdminDashboardPage() {
           className="space-y-4"
         >
           <div>
-            <label className="block text-sm font-medium text-gray-700">Name</label>
+            <label className="block text-sm font-medium text-gray-700">Name<span className="text-danger-500 ml-0.5">*</span></label>
             <input name="name" required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Description</label>
+            <label className="block text-sm font-medium text-gray-700">Description<span className="text-danger-500 ml-0.5">*</span></label>
             <textarea name="description" required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Icon (lucide name)</label>
+            <label className="block text-sm font-medium text-gray-700">Icon (lucide name)<span className="text-danger-500 ml-0.5">*</span></label>
             <input name="icon" required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" placeholder="Home" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Color</label>
+            <label className="block text-sm font-medium text-gray-700">Color<span className="text-danger-500 ml-0.5">*</span></label>
             <input type="color" name="color" required className="mt-1 block w-full h-10 border border-gray-300 rounded-md" />
           </div>
           <div>
@@ -631,19 +632,19 @@ export default function AdminDashboardPage() {
             className="space-y-4"
           >
             <div>
-              <label className="block text-sm font-medium text-gray-700">Name</label>
+              <label className="block text-sm font-medium text-gray-700">Name<span className="text-danger-500 ml-0.5">*</span></label>
               <input name="name" defaultValue={editFamily.name} required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Description</label>
+              <label className="block text-sm font-medium text-gray-700">Description<span className="text-danger-500 ml-0.5">*</span></label>
               <textarea name="description" defaultValue={editFamily.description} required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Icon (lucide name)</label>
+              <label className="block text-sm font-medium text-gray-700">Icon (lucide name)<span className="text-danger-500 ml-0.5">*</span></label>
               <input name="icon" defaultValue={editFamily.icon} required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" placeholder="Home" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Color</label>
+              <label className="block text-sm font-medium text-gray-700">Color<span className="text-danger-500 ml-0.5">*</span></label>
               <input type="color" name="color" defaultValue={editFamily.color} required className="mt-1 block w-full h-10 border border-gray-300 rounded-md" />
             </div>
             <div>
@@ -681,19 +682,19 @@ export default function AdminDashboardPage() {
           className="space-y-4"
         >
           <div>
-            <label className="block text-sm font-medium text-gray-700">Name</label>
+            <label className="block text-sm font-medium text-gray-700">Name<span className="text-danger-500 ml-0.5">*</span></label>
             <input name="name" required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Icon (emoji)</label>
+            <label className="block text-sm font-medium text-gray-700">Icon (emoji)<span className="text-danger-500 ml-0.5">*</span></label>
             <input name="icon" required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" placeholder="🔧" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Description</label>
+            <label className="block text-sm font-medium text-gray-700">Description<span className="text-danger-500 ml-0.5">*</span></label>
             <textarea name="description" required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Color</label>
+            <label className="block text-sm font-medium text-gray-700">Color<span className="text-danger-500 ml-0.5">*</span></label>
             <input type="color" name="color" required className="mt-1 block w-full h-10 border border-gray-300 rounded-md" />
           </div>
           <div>
@@ -737,19 +738,19 @@ export default function AdminDashboardPage() {
             className="space-y-4"
           >
             <div>
-              <label className="block text-sm font-medium text-gray-700">Name</label>
+              <label className="block text-sm font-medium text-gray-700">Name<span className="text-danger-500 ml-0.5">*</span></label>
               <input name="name" defaultValue={editCategory.name} required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Icon (emoji)</label>
+              <label className="block text-sm font-medium text-gray-700">Icon (emoji)<span className="text-danger-500 ml-0.5">*</span></label>
               <input name="icon" defaultValue={editCategory.icon} required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Description</label>
+              <label className="block text-sm font-medium text-gray-700">Description<span className="text-danger-500 ml-0.5">*</span></label>
               <textarea name="description" defaultValue={editCategory.description} required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Color</label>
+              <label className="block text-sm font-medium text-gray-700">Color<span className="text-danger-500 ml-0.5">*</span></label>
               <input type="color" name="color" defaultValue={editCategory.color} required className="mt-1 block w-full h-10 border border-gray-300 rounded-md" />
             </div>
             <div>
@@ -798,14 +799,14 @@ export default function AdminDashboardPage() {
                 <div><span className="font-medium text-gray-500">Status:</span> <Badge>{selectedBooking.status}</Badge></div>
                 <div><span className="font-medium text-gray-500">Payment:</span> <Badge variant={selectedBooking.paymentStatus === 'FULLY_PAID' ? 'success' : 'outline'}>{selectedBooking.paymentStatus}</Badge></div>
                 
-                <div><span className="font-medium text-gray-500">Subtotal:</span> ${selectedBooking.subtotal}</div>
-                <div><span className="font-medium text-gray-500">Total Price:</span> ${selectedBooking.totalPrice}</div>
+                <div><span className="font-medium text-gray-500">Subtotal:</span> {selectedBooking.subtotal}</div>
+                <div><span className="font-medium text-gray-500">Total Price:</span> {selectedBooking.totalPrice}</div>
                 
-                <div><span className="font-medium text-gray-500">Paid Amount:</span> ${selectedBooking.paidAmount}</div>
-                <div><span className="font-medium text-gray-500">Remaining Amount:</span> ${selectedBooking.remainingAmount}</div>
+                <div><span className="font-medium text-gray-500">Paid Amount:</span> {selectedBooking.paidAmount}</div>
+                <div><span className="font-medium text-gray-500">Remaining Amount:</span> {selectedBooking.remainingAmount}</div>
 
-                <div><span className="font-medium text-gray-500">Platform Commission:</span> ${selectedBooking.platformCommission}</div>
-                <div><span className="font-medium text-gray-500">Platform Tax:</span> ${selectedBooking.platformTax}</div>
+                <div><span className="font-medium text-gray-500">Platform Commission:</span> {selectedBooking.platformCommission}</div>
+                <div><span className="font-medium text-gray-500">Platform Tax:</span> {selectedBooking.platformTax}</div>
 
                 {review && (
                   <div className="col-span-2 mt-2 pt-2 border-t flex items-center gap-2">
@@ -840,16 +841,16 @@ export default function AdminDashboardPage() {
       <Modal isOpen={showServiceModal} onClose={() => setShowServiceModal(false)} title={editingService ? 'Edit Service' : 'Add Service'}>
         <form onSubmit={e => { e.preventDefault(); if (editingService) { updateServiceMutation.mutate(); } else { createServiceMutation.mutate(); } }} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Service Name</label>
+            <label className="block text-sm font-medium text-gray-700">Service Name<span className="text-danger-500 ml-0.5">*</span></label>
             <input required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" value={serviceForm.name} onChange={e => setServiceForm({ ...serviceForm, name: e.target.value })} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Description</label>
+            <label className="block text-sm font-medium text-gray-700">Description<span className="text-danger-500 ml-0.5">*</span></label>
             <textarea required rows={3} className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" value={serviceForm.description} onChange={e => setServiceForm({ ...serviceForm, description: e.target.value })} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Category</label>
+              <label className="block text-sm font-medium text-gray-700">Category<span className="text-danger-500 ml-0.5">*</span></label>
               <select className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" value={serviceForm.categoryId} onChange={e => setServiceForm({ ...serviceForm, categoryId: Number(e.target.value) })}>
                 {categories?.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
               </select>
@@ -863,16 +864,16 @@ export default function AdminDashboardPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Price ($)</label>
+              <label className="block text-sm font-medium text-gray-700">Price ($)<span className="text-danger-500 ml-0.5">*</span></label>
               <input type="number" required min="1" className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" value={serviceForm.price} onChange={e => setServiceForm({ ...serviceForm, price: Number(e.target.value) })} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Duration</label>
+              <label className="block text-sm font-medium text-gray-700">Duration<span className="text-danger-500 ml-0.5">*</span></label>
               <input required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" value={serviceForm.duration} onChange={e => setServiceForm({ ...serviceForm, duration: e.target.value })} />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Price Unit</label>
+            <label className="block text-sm font-medium text-gray-700">Price Unit<span className="text-danger-500 ml-0.5">*</span></label>
             <select className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" value={serviceForm.priceUnit} onChange={e => setServiceForm({ ...serviceForm, priceUnit: e.target.value })}>
               <option value="per hour">Per Hour</option>
               <option value="per job">Per Job</option>
@@ -912,20 +913,20 @@ export default function AdminDashboardPage() {
             className="space-y-4"
           >
             <div>
-              <label className="block text-sm font-medium text-gray-700">Name</label>
+              <label className="block text-sm font-medium text-gray-700">Name<span className="text-danger-500 ml-0.5">*</span></label>
               <input name="name" defaultValue={editUser.name} required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <label className="block text-sm font-medium text-gray-700">Email<span className="text-danger-500 ml-0.5">*</span></label>
               <input type="email" name="email" defaultValue={editUser.email} required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Phone</label>
+              <label className="block text-sm font-medium text-gray-700">Phone<span className="text-danger-500 ml-0.5">*</span></label>
               <input name="phone" defaultValue={editUser.phone} required className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Role</label>
+                <label className="block text-sm font-medium text-gray-700">Role<span className="text-danger-500 ml-0.5">*</span></label>
                 <select name="role" defaultValue={editUser.role} className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
                   <option value="CUSTOMER">Customer</option>
                   <option value="PROVIDER">Provider</option>
@@ -933,7 +934,7 @@ export default function AdminDashboardPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Language</label>
+                <label className="block text-sm font-medium text-gray-700">Language<span className="text-danger-500 ml-0.5">*</span></label>
                 <select name="preferredLanguage" defaultValue={editUser.preferredLanguage} className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
                   <option value="en">English</option>
                   <option value="fr">Français</option>
@@ -978,7 +979,7 @@ export default function AdminDashboardPage() {
           className="space-y-4"
         >
           <div>
-            <label className="block text-sm font-medium text-gray-700">Role</label>
+            <label className="block text-sm font-medium text-gray-700">Role<span className="text-danger-500 ml-0.5">*</span></label>
             <select
               value={addUserRole}
               onChange={e => setAddUserRole(e.target.value as UserRole)}
@@ -990,7 +991,7 @@ export default function AdminDashboardPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Full Name</label>
+            <label className="block text-sm font-medium text-gray-700">Full Name<span className="text-danger-500 ml-0.5">*</span></label>
             <input
               value={addUserForm.name}
               onChange={e => setAddUserForm(f => ({ ...f, name: e.target.value }))}
@@ -1000,7 +1001,7 @@ export default function AdminDashboardPage() {
             {addUserErrors.name && <p className="text-xs text-red-500 mt-1">{addUserErrors.name}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Email</label>
+            <label className="block text-sm font-medium text-gray-700">Email<span className="text-danger-500 ml-0.5">*</span></label>
             <input
               type="email"
               value={addUserForm.email}
@@ -1011,7 +1012,7 @@ export default function AdminDashboardPage() {
             {addUserErrors.email && <p className="text-xs text-red-500 mt-1">{addUserErrors.email}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Phone</label>
+            <label className="block text-sm font-medium text-gray-700">Phone<span className="text-danger-500 ml-0.5">*</span></label>
             <input
               type="tel"
               value={addUserForm.phone}
@@ -1022,7 +1023,7 @@ export default function AdminDashboardPage() {
             {addUserErrors.phone && <p className="text-xs text-red-500 mt-1">{addUserErrors.phone}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Password</label>
+            <label className="block text-sm font-medium text-gray-700">Password<span className="text-danger-500 ml-0.5">*</span></label>
             <input
               type="password"
               value={addUserForm.password}
@@ -1033,7 +1034,7 @@ export default function AdminDashboardPage() {
             {addUserErrors.password && <p className="text-xs text-red-500 mt-1">{addUserErrors.password}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Language</label>
+            <label className="block text-sm font-medium text-gray-700">Language<span className="text-danger-500 ml-0.5">*</span></label>
             <select
               value={addUserForm.preferredLanguage}
               onChange={e => setAddUserForm(f => ({ ...f, preferredLanguage: e.target.value }))}

@@ -2,17 +2,36 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
 import { Avatar } from '@/components/shared';
-import { Menu, X, Home, Briefcase, Calendar, User, LogOut, LayoutDashboard, Shield, Settings, ChevronDown, LifeBuoy, ShieldAlert } from 'lucide-react';
-import { useState } from 'react';
+import { Menu, X, Home, Briefcase, Calendar, User, LogOut, LayoutDashboard, Shield, Settings, ChevronDown, LifeBuoy, ShieldAlert, Globe } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { localizedName } from '@/utils/localize';
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuthStore();
   const { notifications, removeNotification } = useUIStore();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLang = i18n.language?.split('-')[0] || 'en';
+  const profileRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+
+  const toggleLanguage = () => {
+    const next = currentLang === 'en' ? 'ar' : 'en';
+    i18n.changeLanguage(next);
+  };
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [profileOpen]);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -38,7 +57,7 @@ export default function Navbar() {
       navLinks.push({ path: '/customer-service', label: t('nav.support', 'Support'), icon: LifeBuoy });
       navLinks.push({ path: '/bookings', label: t('nav.bookings'), icon: Calendar });
     }
-    navLinks.push({ path: '/disputes', label: 'Disputes', icon: ShieldAlert });
+    navLinks.push({ path: '/disputes', label: t('nav.disputes'), icon: ShieldAlert });
   }
 
   return (
@@ -65,7 +84,7 @@ export default function Navbar() {
               <div className="w-9 h-9 bg-primary-600 rounded-xl flex items-center justify-center">
                 <span className="text-white text-lg">⚡</span>
               </div>
-              <span className="text-xl font-bold text-gray-900 hidden sm:block">Srvio</span>
+              <span className="text-xl font-bold text-gray-900 hidden sm:block"><span className="text-primary-600 text-[1.3em] leading-none">خ</span>دمات</span>
             </Link>
 
             {/* Desktop Nav */}
@@ -85,23 +104,30 @@ export default function Navbar() {
 
             {/* Right Side */}
             <div className="flex items-center gap-3">
+              {/* Language Switcher */}
+              <button
+                onClick={toggleLanguage}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors border border-gray-200"
+                title={currentLang === 'en' ? 'Switch to Arabic' : 'التبديل إلى الإنجليزية'}
+              >
+                <Globe className="w-4 h-4" />
+                <span>{currentLang === 'en' ? 'عربي' : 'EN'}</span>
+              </button>
               {isAuthenticated && user ? (
-                <div className="relative">
+                <div className="relative" ref={profileRef}>
                   <button
                     onClick={() => setProfileOpen(!profileOpen)}
                     className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    <Avatar name={user.name} size="sm" />
-                    <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[120px] truncate">{user.name}</span>
+                    <Avatar name={localizedName(user)} size="sm" src={user.avatar} />
+                    <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[120px] truncate">{localizedName(user)}</span>
                     <ChevronDown className="w-4 h-4 text-gray-400" />
                   </button>
 
                   {profileOpen && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setProfileOpen(false)} />
-                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-20 animate-fade-in">
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-20 animate-fade-in">
                         <div className="px-4 py-2 border-b">
-                          <p className="text-sm font-semibold text-gray-900">{user.name}</p>
+                          <p className="text-sm font-semibold text-gray-900">{localizedName(user)}</p>
                           <p className="text-xs text-gray-500">{user.email}</p>
                           <span className={`inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${user.role === 'ADMIN' ? 'bg-red-100 text-red-700' :
                               user.role === 'PROVIDER' ? 'bg-green-100 text-green-700' :
@@ -121,17 +147,17 @@ export default function Navbar() {
                                 <Shield className="w-4 h-4" /> {t('nav.admin')}
                               </Link>
                               <Link to="/admin/settings" onClick={() => setProfileOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                <Settings className="w-4 h-4" /> System Parameters
+                                <Settings className="w-4 h-4" /> {t('nav.system_params')}
                               </Link>
                             </>
                           )}
                           {user.role === 'CUSTOMER_SERVICE' && (
                             <>
                               <Link to="/customer-service" onClick={() => setProfileOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                <LifeBuoy className="w-4 h-4" /> Support
+                                <LifeBuoy className="w-4 h-4" /> {t('nav.support')}
                               </Link>
                               <Link to="/customer-service/disputes" onClick={() => setProfileOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                <ShieldAlert className="w-4 h-4" /> Disputes
+                                <ShieldAlert className="w-4 h-4" /> {t('nav.disputes')}
                               </Link>
                             </>
                           )}
@@ -148,7 +174,6 @@ export default function Navbar() {
                           </button>
                         </div>
                       </div>
-                    </>
                   )}
                 </div>
               ) : (
@@ -187,6 +212,15 @@ export default function Navbar() {
                 <Link to="/register" onClick={() => setMobileOpen(false)} className="flex-1 text-center py-2 text-sm font-medium bg-primary-600 text-white rounded-lg">{t('nav.get_started')}</Link>
               </div>
             )}
+            <div className="px-4 pt-2 pb-1">
+              <button
+                onClick={() => { toggleLanguage(); setMobileOpen(false); }}
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg"
+              >
+                <Globe className="w-5 h-5" />
+                {currentLang === 'en' ? 'العربية' : 'English'}
+              </button>
+            </div>
           </div>
         )}
       </nav>

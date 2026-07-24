@@ -3,10 +3,13 @@ import { mockApi } from '@/api/mockApi';
 import { useAuthStore } from '@/store/authStore';
 import { Card, Badge, Avatar, PageHeader, Skeleton } from '@/components/shared';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Calendar, Clock, MapPin, DollarSign, CheckCircle, Package, TrendingUp } from 'lucide-react';
+import { Calendar, Clock, DollarSign, CheckCircle, Package, TrendingUp } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { localizedName } from '@/utils/localize';
 
 export default function CustomerDashboardPage() {
   const { user } = useAuthStore();
+  const { t, i18n } = useTranslation();
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['customer-stats', user?.id],
@@ -19,6 +22,27 @@ export default function CustomerDashboardPage() {
     queryFn: () => mockApi.getBookings({ userId: user!.id, role: 'CUSTOMER' }),
     enabled: !!user,
   });
+
+  const { data: allUsers } = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: () => mockApi.getAllUsers(),
+  });
+  const userMap = new Map((allUsers || []).map(u => [u.id, u]));
+
+  const { data: services } = useQuery({
+    queryKey: ['services'],
+    queryFn: () => mockApi.getServices(),
+  });
+  const serviceMap = new Map((services || []).map(s => [s.id, s]));
+
+  const formatDateWithDay = (dateStr: string) => {
+    const d = new Date(dateStr + 'T00:00:00');
+    const day = d.toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'long' });
+    const formatted = d.toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    return `${day}, ${formatted}`;
+  };
+
+  const translatedStatus = (s: string) => t(`bookings.status.${s.toLowerCase()}` as any) || s;
 
   if (!user) return null;
 
@@ -37,8 +61,8 @@ export default function CustomerDashboardPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
       <PageHeader 
-        title="My Dashboard" 
-        subtitle={`Welcome back, ${user.name}. Here's what's happening with your services.`} 
+        title={t('customer_dashboard.title')} 
+        subtitle={t('customer_dashboard.subtitle', { name: user.name })} 
       />
 
       {/* Stats Grid */}
@@ -50,7 +74,7 @@ export default function CustomerDashboardPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900">{stats?.totalBookings || 0}</p>
-              <p className="text-xs text-gray-500">Total Bookings</p>
+              <p className="text-xs text-gray-500">{t('customer_dashboard.total_bookings')}</p>
             </div>
           </div>
         </Card>
@@ -61,8 +85,8 @@ export default function CustomerDashboardPage() {
               <DollarSign className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">${stats?.totalSpent || 0}</p>
-              <p className="text-xs text-gray-500">Total Spent</p>
+              <p className="text-2xl font-bold text-gray-900">{stats?.totalSpent || 0}</p>
+              <p className="text-xs text-gray-500">{t('customer_dashboard.total_spent')}</p>
             </div>
           </div>
         </Card>
@@ -74,7 +98,7 @@ export default function CustomerDashboardPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900">{stats?.pendingBookings || 0}</p>
-              <p className="text-xs text-gray-500">Pending</p>
+              <p className="text-xs text-gray-500">{t('customer_dashboard.pending')}</p>
             </div>
           </div>
         </Card>
@@ -86,7 +110,7 @@ export default function CustomerDashboardPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900">{stats?.completedBookings || 0}</p>
-              <p className="text-xs text-gray-500">Completed</p>
+              <p className="text-xs text-gray-500">{t('customer_dashboard.completed')}</p>
             </div>
           </div>
         </Card>
@@ -97,7 +121,7 @@ export default function CustomerDashboardPage() {
         <Card className="lg:col-span-2 p-6">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-bold text-gray-900 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-primary-600" /> Spending Overview
+              <TrendingUp className="w-5 h-5 text-primary-600" /> {t('customer_dashboard.spending_overview')}
             </h3>
           </div>
           <div className="h-[300px]">
@@ -114,12 +138,12 @@ export default function CustomerDashboardPage() {
                   axisLine={false} 
                   tickLine={false} 
                   tick={{ fontSize: 12, fill: '#94a3b8' }}
-                  tickFormatter={(value) => `$${value}`}
+                  tickFormatter={(value) => String(value)}
                 />
                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: unknown) => [`$${value}`, 'Spending'] as [string, string]}
+                  formatter={(value: unknown) => [`${value}`, 'Spending'] as [string, string]}
                 />
                 <Bar dataKey="amount" fill="var(--color-primary-600)" radius={[4, 4, 0, 0]} barSize={40} />
               </BarChart>
@@ -130,27 +154,27 @@ export default function CustomerDashboardPage() {
         {/* Recent Bookings */}
         <Card className="p-6">
           <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-primary-600" /> Recent Bookings
+            <Calendar className="w-5 h-5 text-primary-600" /> {t('customer_dashboard.recent_bookings')}
           </h3>
           <div className="space-y-4">
             {bookings && bookings.length > 0 ? (
               bookings.slice(0, 5).map(booking => (
                 <div key={booking.id} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
-                  <Avatar name={booking.providerName} size="sm" />
+                  <Avatar name={localizedName(userMap.get(booking.providerId) || { name: booking.providerName })} size="sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{booking.serviceName}</p>
-                    <p className="text-xs text-gray-500 mb-1">{booking.providerName}</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">{localizedName(serviceMap.get(booking.serviceId) || { name: booking.serviceName })}</p>
+                    <p className="text-xs text-gray-500 mb-1">{localizedName(userMap.get(booking.providerId) || { name: booking.providerName })}</p>
                     <div className="flex items-center gap-2 text-[10px] text-gray-400">
-                      <span className="flex items-center gap-0.5"><Calendar className="w-3 h-3" /> {booking.date}</span>
-                      <Badge className="scale-75 origin-left">{booking.status}</Badge>
+                      <span className="flex items-center gap-0.5"><Calendar className="w-3 h-3" /> {formatDateWithDay(booking.date)}</span>
+                      <Badge className="scale-75 origin-left">{translatedStatus(booking.status)}</Badge>
                     </div>
                   </div>
-                  <p className="text-sm font-bold text-gray-900">${booking.totalPrice}</p>
+                  <p className="text-sm font-bold text-gray-900">{booking.totalPrice}</p>
                 </div>
               ))
             ) : (
               <div className="text-center py-8">
-                <p className="text-sm text-gray-500">No bookings yet</p>
+                <p className="text-sm text-gray-500">{t('customer_dashboard.no_bookings')}</p>
               </div>
             )}
           </div>

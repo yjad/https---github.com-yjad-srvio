@@ -42,13 +42,14 @@ export function Button({ variant = 'primary', size = 'md', loading, children, cl
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  required?: boolean;
 }
 
-export function Input({ label, error, className, id, ...props }: InputProps) {
+export function Input({ label, error, className, id, required, ...props }: InputProps) {
   const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
   return (
     <div className="space-y-1.5">
-      {label && <label htmlFor={inputId} className="block text-sm font-medium text-gray-700">{label}</label>}
+      {label && <label htmlFor={inputId} className="block text-sm font-medium text-gray-700">{label}{required && <span className="text-danger-500 ml-0.5">*</span>}</label>}
       <input
         id={inputId}
         className={cn(
@@ -68,13 +69,14 @@ interface SelectProps extends InputHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
   options: { value: string | number; label: string }[];
+  required?: boolean;
 }
 
-export function Select({ label, error, options, className, id, ...props }: SelectProps) {
+export function Select({ label, error, options, className, id, required, ...props }: SelectProps) {
   const selectId = id || label?.toLowerCase().replace(/\s+/g, '-');
   return (
     <div className="space-y-1.5">
-      {label && <label htmlFor={selectId} className="block text-sm font-medium text-gray-700">{label}</label>}
+      {label && <label htmlFor={selectId} className="block text-sm font-medium text-gray-700">{label}{required && <span className="text-danger-500 ml-0.5">*</span>}</label>}
       <select
         id={selectId}
         className={cn(
@@ -97,13 +99,14 @@ export function Select({ label, error, options, className, id, ...props }: Selec
 interface TextareaProps extends InputHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
+  required?: boolean;
 }
 
-export function Textarea({ label, error, className, id, ...props }: TextareaProps) {
+export function Textarea({ label, error, className, id, required, ...props }: TextareaProps) {
   const textareaId = id || label?.toLowerCase().replace(/\s+/g, '-');
   return (
     <div className="space-y-1.5">
-      {label && <label htmlFor={textareaId} className="block text-sm font-medium text-gray-700">{label}</label>}
+      {label && <label htmlFor={textareaId} className="block text-sm font-medium text-gray-700">{label}{required && <span className="text-danger-500 ml-0.5">*</span>}</label>}
       <textarea
         id={textareaId}
         className={cn(
@@ -167,11 +170,21 @@ export function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm
 }
 
 // ─── Avatar ────────────────────────────────────────────────
-export function Avatar({ name, size = 'md', className }: { name: string; size?: 'sm' | 'md' | 'lg' | 'xl'; className?: string }) {
+export function Avatar({ name, size = 'md', className, src }: { name: string; size?: 'sm' | 'md' | 'lg' | 'xl'; className?: string; src?: string }) {
   const sizeMap = { sm: 'w-8 h-8 text-xs', md: 'w-10 h-10 text-sm', lg: 'w-14 h-14 text-lg', xl: 'w-20 h-20 text-2xl' };
   const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const colors = ['bg-primary-500', 'bg-accent-500', 'bg-purple-500', 'bg-pink-500', 'bg-amber-500', 'bg-teal-500'];
   const colorIndex = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % colors.length;
+
+  if (src) {
+    return (
+      <img 
+        src={src} 
+        alt={name} 
+        className={cn('rounded-full object-cover shrink-0', sizeMap[size], className)}
+      />
+    );
+  }
 
   return (
     <div className={cn('rounded-full flex items-center justify-center text-white font-bold shrink-0', sizeMap[size], colors[colorIndex], className)}>
